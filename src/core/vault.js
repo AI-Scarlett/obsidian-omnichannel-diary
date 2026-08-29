@@ -39,8 +39,7 @@ class VaultWriter {
     const next = previous.then(async () => {
       let file = this.vault.getAbstractFileByPath(normalized);
       if (!file) file = await this.createText(normalized, initial);
-      const current = await this.vault.read(file);
-      await this.vault.modify(file, `${current}${content}`);
+      await this.vault.process(file, (current) => `${current}${content}`);
       return file;
     });
     this.pending.set(normalized, next.catch(() => undefined));

@@ -1,8 +1,10 @@
 import esbuild from "esbuild";
 import { builtinModules } from "node:module";
+import { readFile } from "node:fs/promises";
 
+const manifest = JSON.parse(await readFile("manifest.json", "utf8"));
 const banner = `/*
-Omnichannel Diary 0.3.0
+Omnichannel Diary ${manifest.version}
 Generated from the independent source in src/. Do not edit this bundle directly.
 */`;
 

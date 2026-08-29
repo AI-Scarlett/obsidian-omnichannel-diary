@@ -7,6 +7,15 @@
   margin: 0 auto;
   padding: 24px 8px 64px;
 }
+.od-channel-wechat { --od-channel: #22a559; }
+.od-channel-feishu { --od-channel: #3370ff; }
+.od-channel-dingtalk { --od-channel: #1677ff; }
+.od-channel-wecom { --od-channel: #07c160; }
+.od-channel-qq { --od-channel: #12b7f5; }
+.od-channel-slack { --od-channel: #611f69; }
+.od-channel-telegram { --od-channel: #229ed9; }
+.od-channel-discord { --od-channel: #5865f2; }
+.od-channel-whatsapp { --od-channel: #25d366; }
 .omnichannel-diary-settings .setting-item { border-color: var(--od-border); }
 .od-hero {
   position: relative; overflow: hidden; display: flex; align-items: flex-end; justify-content: space-between; gap: 28px;

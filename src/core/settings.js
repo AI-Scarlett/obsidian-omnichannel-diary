@@ -3,15 +3,15 @@
 const CHANNEL_IDS = ["wechat", "feishu", "dingtalk", "wecom", "qq", "slack", "telegram", "discord", "whatsapp"];
 
 const CHANNEL_META = {
-  wechat: { name: "微信", mark: "微", color: "#22a559", setup: "扫码连接" },
-  feishu: { name: "飞书 / Lark", mark: "飞", color: "#3370ff", setup: "扫码创建应用或填写凭据" },
-  dingtalk: { name: "钉钉", mark: "钉", color: "#1677ff", setup: "应用凭据" },
-  wecom: { name: "企业微信", mark: "企", color: "#07c160", setup: "智能机器人凭据" },
-  qq: { name: "QQ", mark: "Q", color: "#12b7f5", setup: "QQ 开放平台凭据" },
-  slack: { name: "Slack", mark: "S", color: "#611f69", setup: "Socket Mode 令牌" },
-  telegram: { name: "Telegram", mark: "T", color: "#229ed9", setup: "BotFather 令牌" },
-  discord: { name: "Discord", mark: "D", color: "#5865f2", setup: "Bot 令牌" },
-  whatsapp: { name: "WhatsApp", mark: "W", color: "#25d366", setup: "扫码连接" },
+  wechat: { name: "微信", mark: "微", setup: "扫码连接" },
+  feishu: { name: "飞书 / Lark", mark: "飞", setup: "扫码创建应用或填写凭据" },
+  dingtalk: { name: "钉钉", mark: "钉", setup: "应用凭据" },
+  wecom: { name: "企业微信", mark: "企", setup: "智能机器人凭据" },
+  qq: { name: "QQ", mark: "Q", setup: "QQ 开放平台凭据" },
+  slack: { name: "Slack", mark: "S", setup: "Socket Mode 令牌" },
+  telegram: { name: "Telegram", mark: "T", setup: "BotFather 令牌" },
+  discord: { name: "Discord", mark: "D", setup: "Bot 令牌" },
+  whatsapp: { name: "WhatsApp", mark: "W", setup: "扫码连接" },
 };
 
 const DEFAULT_SETTINGS = {

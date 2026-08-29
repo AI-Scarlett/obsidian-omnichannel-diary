@@ -20,4 +20,4 @@ The following were newly authored for 0.3.x:
 - settings interface and stylesheet;
 - README, architecture, setup, privacy, and this record.
 
-The public 0.3.0 repository history begins with this independent tree, so the distribution is not represented as a fork or continuation of another plugin.
+The public 0.3.x repository history begins with this independent tree, so the distribution is not represented as a fork or continuation of another plugin.

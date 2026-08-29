@@ -59,7 +59,7 @@ class PairingModal extends Modal {
     this.titleEl.setText(`连接 ${meta.name}`);
     this.contentEl.addClass("od-pairing-modal");
     const brand = this.contentEl.createDiv({ cls: "od-pair-brand" });
-    brand.createDiv({ cls: "od-channel-mark", text: meta.mark }).style.setProperty("--od-channel", meta.color);
+    brand.createDiv({ cls: `od-channel-mark od-channel-${this.channelId}`, text: meta.mark });
     brand.createDiv({ cls: "od-pair-copy" }).createEl("p", { text: "授权只用于接收你发给机器人的内容；凭据保存在当前 Vault 的插件数据中。" });
     this.qrBox = this.contentEl.createDiv({ cls: "od-qr-box od-qr-loading" });
     const spinner = this.qrBox.createDiv({ cls: "od-spinner" });
@@ -241,7 +241,7 @@ class DiarySettingTab extends PluginSettingTab {
     for (const id of CHANNEL_IDS) {
       const meta = CHANNEL_META[id];
       const item = grid.createDiv({ cls: "od-mini-channel" });
-      item.createSpan({ cls: "od-mini-mark", text: meta.mark }).style.setProperty("--od-channel", meta.color);
+      item.createSpan({ cls: `od-mini-mark od-channel-${id}`, text: meta.mark });
       item.createSpan({ text: meta.name });
       const state = item.createSpan({ cls: "od-state-dot" });
       this.statusElements.set(id, { dot: state });
@@ -257,8 +257,7 @@ class DiarySettingTab extends PluginSettingTab {
   renderChannelCard(grid, id) {
     const meta = CHANNEL_META[id];
     const config = this.plugin.settings.channels[id];
-    const card = grid.createEl("details", { cls: "od-channel-card" });
-    card.style.setProperty("--od-channel", meta.color);
+    const card = grid.createEl("details", { cls: `od-channel-card od-channel-${id}` });
     const summary = card.createEl("summary");
     summary.createSpan({ cls: "od-channel-mark", text: meta.mark });
     const title = summary.createDiv({ cls: "od-channel-title" });
