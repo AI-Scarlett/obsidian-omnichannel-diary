@@ -85,6 +85,10 @@
 .od-channel-body { padding: 0 18px 18px; border-top: 1px solid var(--od-border); }
 .od-channel-body .setting-item { padding: 13px 0; }
 .od-channel-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 15px; }
+.od-channel-runtime { margin: 12px 0 0; padding: 8px 10px; border-radius: 9px; background: var(--background-primary); color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+.od-channel-runtime[data-state="connected"] { background: color-mix(in srgb, #22b573 9%, transparent); color: #15945b; }
+.od-channel-runtime[data-state="connecting"], .od-channel-runtime[data-state="pairing"] { background: color-mix(in srgb, #e5a321 10%, transparent); color: #b77700; }
+.od-channel-runtime[data-state="error"] { background: color-mix(in srgb, var(--text-error) 9%, transparent); color: var(--text-error); }
 .od-channel-note { margin: 13px 0 0; color: var(--text-faint); font-size: 12px; line-height: 1.55; }
 .od-privacy-panel li { margin-bottom: 8px; color: var(--text-muted); line-height: 1.55; }
 .od-domain-chips { display: flex; flex-wrap: wrap; gap: 7px; }

@@ -15,7 +15,7 @@ class OmnichannelDiaryPlugin extends Plugin {
     const saved = await this.loadData();
     this.settings = normalizeSettings(saved);
     this.migrateLegacyRuntimeData();
-    if (saved?.schemaVersion !== 1) await this.saveSettings();
+    if (JSON.stringify(saved || {}) !== JSON.stringify(this.settings)) await this.saveSettings();
     this.writer = new VaultWriter(this.app.vault);
     this.diary = new DiaryService(this.writer, () => this.settings, () => void this.saveSettings());
     this.channelManager = new ChannelManager(this, async (envelope) => this.router.handle(envelope));
@@ -53,19 +53,32 @@ class OmnichannelDiaryPlugin extends Plugin {
   }
 
   dataPath(name) {
+    return this.channelDataPath(name, true);
+  }
+
+  channelDataPath(name, create = false) {
     const adapter = this.app.vault.adapter;
     const basePath = typeof adapter.getBasePath === "function" ? adapter.getBasePath() : adapter.basePath;
     if (!basePath) throw new Error("当前 Vault 适配器不支持本地数据目录");
     const directory = path.join(basePath, this.app.vault.configDir, "plugins", this.manifest.id, ".channel-data", name);
-    fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+    if (create) fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     return directory;
   }
 
-  runtimePath() {
-    const adapter = this.app.vault.adapter;
-    const basePath = typeof adapter.getBasePath === "function" ? adapter.getBasePath() : adapter.basePath;
-    if (!basePath) throw new Error("当前 Vault 适配器不支持本地插件入口");
-    return path.join(basePath, this.app.vault.configDir, "plugins", this.manifest.id, "main.js");
+  hasWhatsAppAuth() {
+    return fs.existsSync(path.join(this.channelDataPath("whatsapp-auth"), "creds.json"));
+  }
+
+  backupWhatsAppAuth() {
+    const source = this.channelDataPath("whatsapp-auth");
+    if (!fs.existsSync(source)) return null;
+    const parent = this.channelDataPath("whatsapp-auth-backups", true);
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z").replace("T", "-");
+    let target = path.join(parent, `whatsapp-auth-${stamp}`);
+    let suffix = 1;
+    while (fs.existsSync(target)) target = path.join(parent, `whatsapp-auth-${stamp}-${suffix++}`);
+    fs.renameSync(source, target);
+    return target;
   }
 
   migrateLegacyRuntimeData() {

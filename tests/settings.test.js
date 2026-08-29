@@ -42,3 +42,19 @@ test("legacy data keeps user folders and WeChat authorization while removing obs
   assert.equal(settings.channels.wechat.enabled, true);
   assert.equal(JSON.stringify(settings).includes("unused"), false);
 });
+
+test("channels with incomplete required credentials are not left enabled", () => {
+  const settings = normalizeSettings({
+    schemaVersion: 1,
+    channels: {
+      wechat: { enabled: true, token: "" },
+      feishu: { enabled: true, appId: "cli_valid", appSecret: "" },
+      telegram: { enabled: true, botToken: "valid" },
+      whatsapp: { enabled: true },
+    },
+  });
+  assert.equal(settings.channels.wechat.enabled, false);
+  assert.equal(settings.channels.feishu.enabled, false);
+  assert.equal(settings.channels.telegram.enabled, true);
+  assert.equal(settings.channels.whatsapp.enabled, true);
+});

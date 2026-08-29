@@ -15,22 +15,37 @@ class FeishuChannel extends BaseChannel {
     super("feishu", config, context);
     this.client = null;
     this.wsClient = null;
+    this.registrationAbort = null;
   }
 
-  get domain() {
+  get clientDomain() {
     return this.config.domain === "lark" ? Lark.Domain.Lark : Lark.Domain.Feishu;
+  }
+
+  get registrationDomain() {
+    return this.config.domain === "lark" ? "accounts.larksuite.com" : "accounts.feishu.cn";
   }
 
   async beginRegistration(callbacks = {}) {
     callbacks.onStatus?.("等待飞书 / Lark 官方授权…");
-    const result = await Lark.registerApp({
-      domain: this.domain,
-      onQRCodeReady: (info) => {
-        callbacks.onQr?.(info.url);
-        callbacks.onStatus?.("请扫码并按页面提示授权创建应用");
-      },
-      onStatusChange: (info) => callbacks.onStatus?.(`授权状态：${info.status || info}`),
-    });
+    if (Lark.defaultHttpInstance?.defaults) Lark.defaultHttpInstance.defaults.adapter = "http";
+    const controller = new AbortController();
+    this.registrationAbort = controller;
+    let result;
+    try {
+      result = await Lark.registerApp({
+        domain: this.registrationDomain,
+        larkDomain: "accounts.larksuite.com",
+        signal: controller.signal,
+        onQRCodeReady: (info) => {
+          callbacks.onQr?.(info.url);
+          callbacks.onStatus?.("请扫码并按页面提示授权创建应用");
+        },
+        onStatusChange: (info) => callbacks.onStatus?.(`授权状态：${info.status || info}`),
+      });
+    } finally {
+      if (this.registrationAbort === controller) this.registrationAbort = null;
+    }
     this.config.appId = result.client_id;
     this.config.appSecret = result.client_secret;
     this.config.enabled = true;
@@ -87,7 +102,8 @@ class FeishuChannel extends BaseChannel {
   async start() {
     this.assertFields(["appId", "appSecret"]);
     this.running = true;
-    const baseConfig = { appId: this.config.appId, appSecret: this.config.appSecret, domain: this.domain };
+    if (Lark.defaultHttpInstance?.defaults) Lark.defaultHttpInstance.defaults.adapter = "http";
+    const baseConfig = { appId: this.config.appId, appSecret: this.config.appSecret, domain: this.clientDomain };
     this.client = new Lark.Client(baseConfig);
     this.wsClient = new Lark.WSClient({
       ...baseConfig,
@@ -105,6 +121,8 @@ class FeishuChannel extends BaseChannel {
 
   async stop() {
     this.running = false;
+    this.registrationAbort?.abort();
+    this.registrationAbort = null;
     this.wsClient?.close({ force: true });
     this.wsClient = null;
     this.client = null;

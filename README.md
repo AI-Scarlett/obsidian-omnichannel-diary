@@ -26,7 +26,7 @@ All folders and capture rules are configurable.
 | Slack | Socket Mode app token and bot token | Socket Mode WebSocket | Authenticated private file URLs |
 | Telegram | BotFather token | Bot API long polling | Photo, document, audio, voice, video, and animation |
 | Discord | Bot token | Gateway v10 WebSocket | Message attachment URLs |
-| WhatsApp | Linked-device QR | Baileys in an isolated child process | Image, document, audio, video, and sticker |
+| WhatsApp | Linked-device QR | Bundled Baileys Node transport | Image, document, audio, video, and sticker |
 
 Platform access is subject to each platform's account eligibility and developer settings. Slack, Telegram, and Discord do not provide QR authorization for their official Bot APIs; their official developer tokens are required.
 
@@ -48,7 +48,7 @@ styles.css
 
 Then reload Obsidian, open **Settings → Community plugins**, and enable **Omnichannel Diary**.
 
-WhatsApp does not require a sibling worker file. The installed `main.js` starts its bundled WhatsApp branch in a child process.
+WhatsApp does not require a sibling worker file or a system Node installation. Its transport is bundled into the installed `main.js` and runs inside the Obsidian plugin process.
 
 ## Configure
 

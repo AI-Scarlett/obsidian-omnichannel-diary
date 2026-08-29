@@ -3,15 +3,26 @@
 const CHANNEL_IDS = ["wechat", "feishu", "dingtalk", "wecom", "qq", "slack", "telegram", "discord", "whatsapp"];
 
 const CHANNEL_META = {
-  wechat: { name: "微信", mark: "微", setup: "扫码连接" },
-  feishu: { name: "飞书 / Lark", mark: "飞", setup: "扫码创建应用或填写凭据" },
-  dingtalk: { name: "钉钉", mark: "钉", setup: "应用凭据" },
-  wecom: { name: "企业微信", mark: "企", setup: "智能机器人凭据" },
-  qq: { name: "QQ", mark: "Q", setup: "QQ 开放平台凭据" },
-  slack: { name: "Slack", mark: "S", setup: "Socket Mode 令牌" },
-  telegram: { name: "Telegram", mark: "T", setup: "BotFather 令牌" },
-  discord: { name: "Discord", mark: "D", setup: "Bot 令牌" },
-  whatsapp: { name: "WhatsApp", mark: "W", setup: "扫码连接" },
+  wechat: { name: "微信", mark: "微", setup: "官方扫码授权" },
+  feishu: { name: "飞书 / Lark", mark: "飞", setup: "官方扫码创建应用 / 应用凭据" },
+  dingtalk: { name: "钉钉", mark: "钉", setup: "官方应用凭据" },
+  wecom: { name: "企业微信", mark: "企", setup: "官方机器人凭据" },
+  qq: { name: "QQ", mark: "Q", setup: "官方开放平台凭据" },
+  slack: { name: "Slack", mark: "S", setup: "官方 Socket Mode 令牌" },
+  telegram: { name: "Telegram", mark: "T", setup: "官方 BotFather 令牌" },
+  discord: { name: "Discord", mark: "D", setup: "官方 Bot 令牌" },
+  whatsapp: { name: "WhatsApp", mark: "W", setup: "官方关联设备扫码" },
+};
+
+const REQUIRED_CREDENTIALS = {
+  wechat: ["token"],
+  feishu: ["appId", "appSecret"],
+  dingtalk: ["clientId", "clientSecret"],
+  wecom: ["botId", "secret"],
+  qq: ["appId", "appSecret"],
+  slack: ["appToken", "botToken"],
+  telegram: ["botToken"],
+  discord: ["botToken"],
 };
 
 const DEFAULT_SETTINGS = {
@@ -67,6 +78,11 @@ function normalizeSettings(saved) {
   value.storage.attachmentFolder = sanitizeFolder(value.storage.attachmentFolder, DEFAULT_SETTINGS.storage.attachmentFolder);
   value.capture.maxFileMb = Math.min(100, Math.max(1, Number(value.capture.maxFileMb) || 20));
   value.runtime.recentMessageIds = Array.isArray(value.runtime.recentMessageIds) ? value.runtime.recentMessageIds.slice(-500) : [];
+  for (const [id, fields] of Object.entries(REQUIRED_CREDENTIALS)) {
+    if (value.channels[id].enabled && fields.some((field) => !String(value.channels[id][field] || "").trim())) {
+      value.channels[id].enabled = false;
+    }
+  }
   return value;
 }
 

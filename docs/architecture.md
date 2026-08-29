@@ -16,9 +16,9 @@ There is no model invocation or semantic decision layer.
 The same bundle has two entries:
 
 - Normal Obsidian load exports the plugin class.
-- `--omnichannel-whatsapp-worker` starts the WhatsApp process without loading the Obsidian module.
+- The WhatsApp transport is bundled into the plugin entry and uses the Node APIs exposed by Obsidian desktop.
 
-This branch keeps WhatsApp's long-lived transport isolated while retaining the three-file Obsidian release format.
+This keeps the three-file Obsidian release format without relying on Electron's disabled run-as-node mode or unavailable V8 workers.
 
 ## Failure behavior
 

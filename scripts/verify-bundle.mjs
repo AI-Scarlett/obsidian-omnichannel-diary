@@ -11,8 +11,9 @@ if (manifest.id !== "omnichannel-diary") failures.push("manifest id is not stabl
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) failures.push("manifest version is not x.y.z");
 if (manifest.version !== packageJson.version) failures.push("manifest and package versions differ");
 if (!versions[manifest.version]) failures.push("versions.json lacks the current version");
-if (!bundle.includes("--omnichannel-whatsapp-worker")) failures.push("WhatsApp worker entry is missing");
-if (!bundle.includes("runtimePath")) failures.push("WhatsApp worker lacks an explicit installed main.js path");
+if (!bundle.includes("runWhatsAppWorker")) failures.push("WhatsApp bundled runtime is missing");
+if (bundle.includes("omnichannel-whatsapp-worker")) failures.push("bundle still starts WhatsApp through a V8 worker entry");
+if (bundle.includes("ELECTRON_RUN_AS_NODE")) failures.push("bundle still depends on disabled Electron run-as-node support");
 if (bundle.includes("whatsapp.worker.js")) failures.push("bundle still depends on a sibling worker");
 if (/\b(openai|anthropic)\b/i.test(bundle)) failures.push("AI provider code is present");
 if (bundleStat.size < 10_000) failures.push("bundle is unexpectedly small");

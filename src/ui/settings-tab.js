@@ -103,6 +103,35 @@ class PairingModal extends Modal {
   }
 }
 
+class WhatsAppReconnectModal extends Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  onOpen() {
+    this.titleEl.setText("重新关联 WhatsApp");
+    this.contentEl.createEl("p", { text: "当前 Vault 已保存一组 WhatsApp 关联设备凭据。继续后，插件会先停止连接并把原凭据移动到可恢复的备份目录，再生成新的二维码。" });
+    this.contentEl.createEl("p", { cls: "od-pair-footnote", text: "此操作不会直接删除旧凭据；若新授权失败，可以从 .channel-data/whatsapp-auth-backups 恢复。" });
+    const actions = this.contentEl.createDiv({ cls: "od-modal-actions" });
+    iconButton(actions, "取消", "x", () => this.close(), "is-quiet");
+    const proceed = iconButton(actions, "备份并重新扫码", "scan-line", async () => {
+      proceed.disabled = true;
+      try {
+        await this.plugin.channelManager.stop("whatsapp");
+        this.plugin.backupWhatsAppAuth();
+        this.plugin.settings.channels.whatsapp.enabled = false;
+        await this.plugin.saveSettings();
+        this.close();
+        new PairingModal(this.app, this.plugin, "whatsapp").open();
+      } catch (error) {
+        new Notice(`WhatsApp：${error?.message || error}`, 8000);
+        proceed.disabled = false;
+      }
+    }, "is-primary");
+  }
+}
+
 class ManualCaptureModal extends Modal {
   constructor(app, plugin) {
     super(app);
@@ -267,27 +296,39 @@ class DiarySettingTab extends PluginSettingTab {
     this.statusElements.set(id, { badge });
     const body = card.createDiv({ cls: "od-channel-body" });
     new Setting(body).setName("启用此渠道").setDesc("Obsidian 打开时自动连接").addToggle((toggle) => toggle.setValue(Boolean(config.enabled)).onChange(async (value) => {
+      const previous = config.enabled;
       config.enabled = value;
       await this.plugin.saveSettings();
       try {
         if (value) await this.plugin.channelManager.start(id);
         else await this.plugin.channelManager.stop(id);
-      } catch (error) { new Notice(`${meta.name}：${error?.message || error}`, 8000); }
+      } catch (error) {
+        config.enabled = previous;
+        await this.plugin.saveSettings();
+        new Notice(`${meta.name}：${error?.message || error}`, 8000);
+      }
       this.render();
     }));
     for (const field of CHANNEL_FIELDS[id]) this.renderChannelField(body, config, field);
     const actions = body.createDiv({ cls: "od-channel-actions" });
     if (["wechat", "feishu", "whatsapp"].includes(id)) {
-      iconButton(actions, id === "feishu" ? "扫码创建应用" : "扫码连接", "scan-line", () => new PairingModal(this.app, this.plugin, id).open(), "is-primary");
+      const hasWhatsAppAuth = id === "whatsapp" && this.plugin.hasWhatsAppAuth();
+      const label = id === "feishu" ? "扫码创建应用" : hasWhatsAppAuth ? "重新扫码" : "扫码连接";
+      iconButton(actions, label, "scan-line", () => {
+        if (hasWhatsAppAuth) new WhatsAppReconnectModal(this.app, this.plugin).open();
+        else new PairingModal(this.app, this.plugin, id).open();
+      }, "is-primary");
     }
     if (SETUP_LINKS[id]) iconButton(actions, "打开官方设置", "external-link", () => window.open(SETUP_LINKS[id], "_blank", "noopener,noreferrer"), "is-quiet");
     iconButton(actions, "测试重连", "plug-zap", async () => {
       try { await this.plugin.channelManager.restart(id); new Notice(`${meta.name} 已发起重连`); }
       catch (error) { new Notice(`${meta.name}：${error?.message || error}`, 8000); }
     });
+    const runtime = body.createEl("p", { cls: "od-channel-runtime", text: "当前未启用" });
+    this.statusElements.get(id).runtime = runtime;
     const note = body.createEl("p", { cls: "od-channel-note" });
     if (id === "wechat") note.setText("使用微信官方 iLink / ClawBot 授权，不是网页登录或设备模拟。功能是否可用取决于微信账号的开放范围。");
-    else if (id === "whatsapp") note.setText("扫码后会作为 WhatsApp 已关联设备运行；会话凭据保存在当前插件目录，不需要额外 worker 文件。");
+    else if (id === "whatsapp") note.setText("通过 WhatsApp 官方“已关联设备”扫码。现有授权会直接重连；重新扫码前会先把旧凭据移入可恢复备份。");
     else if (["telegram", "discord", "slack"].includes(id)) note.setText("该平台的官方 Bot 接口不提供个人账号扫码接入；请从官方开发者入口创建 Bot 并粘贴令牌。");
     else note.setText("使用平台官方长连接 / Stream 接口，无需公网回调地址。");
   }
@@ -384,6 +425,10 @@ class DiarySettingTab extends PluginSettingTab {
         elements.badge.setAttr("data-state", state);
         elements.badge.setText(state === "connected" ? "已连接" : state === "connecting" ? "连接中" : state === "pairing" ? "待扫码" : state === "error" ? "需处理" : "未启用");
         elements.badge.setAttr("title", value.detail || "");
+      }
+      if (elements.runtime) {
+        elements.runtime.setAttr("data-state", state);
+        elements.runtime.setText(value.detail || (state === "connected" ? "连接正常" : state === "error" ? "连接异常" : "当前未启用"));
       }
     }
     if (this.overviewOnline) this.overviewOnline.setText(String(online));

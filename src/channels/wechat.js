@@ -42,7 +42,7 @@ function headers(token) {
 async function ilinkJson(baseUrl, endpoint, options = {}) {
   const body = options.body === undefined ? undefined : JSON.stringify({
     ...options.body,
-    base_info: { channel_version: "2.1.0", bot_agent: "OmnichannelDiary/0.3.0" },
+    base_info: { channel_version: "2.1.0", bot_agent: "OmnichannelDiary/0.3" },
   });
   const { response } = await safeFetch(`${String(baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`, {
     method: options.method || (body ? "POST" : "GET"),
@@ -93,46 +93,55 @@ class WeChatChannel extends BaseChannel {
   constructor(config, context) {
     super("wechat", config, context);
     this.abortController = null;
+    this.pairingAbort = null;
   }
 
   async beginPairing(callbacks = {}) {
+    const controller = new AbortController();
+    this.pairingAbort = controller;
     let baseUrl = DEFAULT_BASE_URL;
-    callbacks.onStatus?.("正在生成微信二维码…");
-    const qr = await ilinkJson(baseUrl, "ilink/bot/get_bot_qrcode?bot_type=3", {
-      method: "POST",
-      body: { local_token_list: this.config.token ? [this.config.token] : [] },
-      timeoutMs: 30_000,
-    });
-    if (!qr.qrcode || !qr.qrcode_img_content) throw new Error("微信服务没有返回二维码");
-    callbacks.onQr?.(qr.qrcode_img_content);
-    callbacks.onStatus?.("请用微信扫码并在手机上确认");
-    const deadline = Date.now() + 8 * 60_000;
-    while (Date.now() < deadline) {
-      const status = await ilinkJson(baseUrl, `ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qr.qrcode)}`, { timeoutMs: 40_000 });
-      if (status.status === "scaned") callbacks.onStatus?.("已扫码，请在微信中确认");
-      if (status.status === "scaned_but_redirect" && status.redirect_host) {
-        baseUrl = `https://${String(status.redirect_host).replace(/^https?:\/\//, "")}`;
-      } else if (status.status === "need_verifycode" || status.status === "verify_code_blocked") {
-        throw new Error("微信要求输入配对码；请在微信端完成验证后重新扫码");
-      } else if (status.status === "expired") {
-        throw new Error("微信二维码已过期，请重新生成");
-      } else if (status.status === "confirmed") {
-        if (!status.bot_token) throw new Error("微信确认成功但未返回连接凭据");
-        Object.assign(this.config, {
-          token: status.bot_token,
-          accountId: status.ilink_bot_id || "",
-          userId: status.ilink_user_id || "",
-          baseUrl: status.baseurl || baseUrl,
-          syncBuf: "",
-          enabled: true,
-        });
-        await this.context.saveSettings();
-        callbacks.onStatus?.("微信已连接");
-        return this.config;
+    try {
+      callbacks.onStatus?.("正在生成微信二维码…");
+      const qr = await ilinkJson(baseUrl, "ilink/bot/get_bot_qrcode?bot_type=3", {
+        method: "POST",
+        body: { local_token_list: this.config.token ? [this.config.token] : [] },
+        timeoutMs: 30_000,
+        signal: controller.signal,
+      });
+      if (!qr.qrcode || !qr.qrcode_img_content) throw new Error("微信服务没有返回二维码");
+      callbacks.onQr?.(qr.qrcode_img_content);
+      callbacks.onStatus?.("请用微信扫码并在手机上确认");
+      const deadline = Date.now() + 8 * 60_000;
+      while (Date.now() < deadline && !controller.signal.aborted) {
+        const status = await ilinkJson(baseUrl, `ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qr.qrcode)}`, { timeoutMs: 40_000, signal: controller.signal });
+        if (status.status === "scaned") callbacks.onStatus?.("已扫码，请在微信中确认");
+        if (status.status === "scaned_but_redirect" && status.redirect_host) {
+          baseUrl = `https://${String(status.redirect_host).replace(/^https?:\/\//, "")}`;
+        } else if (status.status === "need_verifycode" || status.status === "verify_code_blocked") {
+          throw new Error("微信要求输入配对码；请在微信端完成验证后重新扫码");
+        } else if (status.status === "expired") {
+          throw new Error("微信二维码已过期，请重新生成");
+        } else if (status.status === "confirmed") {
+          if (!status.bot_token) throw new Error("微信确认成功但未返回连接凭据");
+          Object.assign(this.config, {
+            token: status.bot_token,
+            accountId: status.ilink_bot_id || "",
+            userId: status.ilink_user_id || "",
+            baseUrl: status.baseurl || baseUrl,
+            syncBuf: "",
+            enabled: true,
+          });
+          await this.context.saveSettings();
+          callbacks.onStatus?.("微信已连接");
+          return this.config;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 900));
       }
-      await new Promise((resolve) => setTimeout(resolve, 900));
+      if (controller.signal.aborted) throw new Error("微信连接已取消");
+      throw new Error("微信扫码等待超时");
+    } finally {
+      if (this.pairingAbort === controller) this.pairingAbort = null;
     }
-    throw new Error("微信扫码等待超时");
   }
 
   async start() {
@@ -185,6 +194,8 @@ class WeChatChannel extends BaseChannel {
 
   async stop() {
     this.running = false;
+    this.pairingAbort?.abort();
+    this.pairingAbort = null;
     this.abortController?.abort();
     this.abortController = null;
     this.setState("stopped");

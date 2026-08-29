@@ -17,7 +17,7 @@ test("WeChat UIN header decodes to an unsigned integer", () => {
   assert.match(Buffer.from(randomUin(), "base64").toString("utf8"), /^\d+$/);
 });
 
-test("WhatsApp worker normalizes wrapped text and media metadata", () => {
+test("WhatsApp runtime normalizes wrapped text and media metadata", () => {
   const wrapped = { ephemeralMessage: { message: { imageMessage: { caption: "caption", mimetype: "image/png" } } } };
   const content = unwrapMessage(wrapped);
   assert.equal(messageText(content), "caption");

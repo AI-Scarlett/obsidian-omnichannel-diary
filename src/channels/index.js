@@ -41,7 +41,6 @@ class ChannelManager {
       },
       saveSettings: () => this.plugin.saveSettings(),
       dataPath: (name) => this.plugin.dataPath(name),
-      runtimePath: () => this.plugin.runtimePath(),
     };
   }
 
@@ -111,6 +110,10 @@ class ChannelManager {
       else await instance.beginPairing(callbacks);
       if (id !== "whatsapp") await this.restart(id);
     } catch (error) {
+      try { await instance.stop(); } catch (_) {}
+      this.instances.delete(id);
+      this.plugin.settings.channels[id].enabled = false;
+      try { await this.plugin.saveSettings(); } catch (_) {}
       this.statuses[id] = { state: "error", detail: error?.message || String(error) };
       for (const listener of this.listeners) listener(this.getStatuses());
       throw error;
