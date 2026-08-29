@@ -1,0 +1,10 @@
+{
+  "id": "omnichannel-diary",
+  "name": "Omnichannel Diary",
+  "version": "0.3.0",
+  "minAppVersion": "1.11.4",
+  "description": "Save messages, web pages, and attachments from nine chat channels into your local vault.",
+  "author": "AI-Scarlett",
+  "authorUrl": "https://github.com/AI-Scarlett",
+  "isDesktopOnly": true
+}
