@@ -50,8 +50,8 @@ class TelegramChannel extends BaseChannel {
       id: String(message.message_id),
       timestamp: new Date(Number(message.date || 0) * 1000 || Date.now()),
       senderId: String(sender.id || "telegram-user"),
-      senderName: [sender.first_name, sender.last_name].filter(Boolean).join(" ") || sender.title || sender.username || "Telegram 用户",
-      chatName: chat.title || chat.username || String(chat.id || "Telegram 私聊"),
+      senderName: [sender.first_name, sender.last_name].filter(Boolean).join(" ") || sender.title || sender.username || this.t("Telegram 用户", "Telegram user"),
+      chatName: chat.title || chat.username || String(chat.id || this.t("Telegram 私聊", "Telegram direct message")),
       isGroup: ["group", "supergroup", "channel"].includes(chat.type),
       text: message.text || message.caption || "",
       attachments,
@@ -85,7 +85,7 @@ class TelegramChannel extends BaseChannel {
         retryMs = 1_000;
       } catch (error) {
         if (signal.aborted) break;
-        this.setState("error", `Telegram 重试中：${error?.message || error}`);
+        this.setState("error", this.t("Telegram 重试中：{error}", "Retrying Telegram: {error}", { error: error?.message || error }));
         await new Promise((resolve) => setTimeout(resolve, retryMs));
         retryMs = Math.min(30_000, retryMs * 2);
       }

@@ -63,7 +63,7 @@ class DiscordChannel extends BaseChannel {
     if (packet.op !== 0) return;
     if (packet.t === "READY") {
       this.botId = packet.d.user?.id || "";
-      this.setState("connected", packet.d.user?.username || "Discord 在线");
+      this.setState("connected", packet.d.user?.username || this.t("Discord 在线", "Discord online"));
       return;
     }
     if (packet.t !== "MESSAGE_CREATE") return;
@@ -73,8 +73,8 @@ class DiscordChannel extends BaseChannel {
       id: message.id,
       timestamp: new Date(message.timestamp),
       senderId: message.author?.id || "discord-user",
-      senderName: message.member?.nick || message.author?.global_name || message.author?.username || "Discord 用户",
-      chatName: message.guild_id ? `Discord ${message.guild_id}/${message.channel_id}` : "Discord 私聊",
+      senderName: message.member?.nick || message.author?.global_name || message.author?.username || this.t("Discord 用户", "Discord user"),
+      chatName: message.guild_id ? `Discord ${message.guild_id}/${message.channel_id}` : this.t("Discord 私聊", "Discord direct message"),
       isGroup: Boolean(message.guild_id),
       mentioned: (message.mentions || []).some((user) => user.id === this.botId),
       text: message.content || "",
@@ -88,7 +88,7 @@ class DiscordChannel extends BaseChannel {
   async start() {
     this.assertFields(["botToken"]);
     this.running = true;
-    this.setState("connecting", "正在连接 Gateway");
+    this.setState("connecting", this.t("正在连接 Gateway", "Connecting to Gateway"));
     await this.connect();
   }
 

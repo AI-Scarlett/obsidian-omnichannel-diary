@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { Plugin, Notice } = require("obsidian");
 const { normalizeSettings } = require("./core/settings");
+const { appLocale, translate } = require("./core/i18n");
 const { VaultWriter } = require("./core/vault");
 const { DiaryService } = require("./core/diary");
 const { CaptureRouter } = require("./core/router");
@@ -19,7 +20,10 @@ class OmnichannelDiaryPlugin extends Plugin {
     this.writer = new VaultWriter(this.app.vault);
     this.diary = new DiaryService(this.writer, () => this.settings, () => this.saveSettings());
     this.channelManager = new ChannelManager(this, async (envelope) => this.router.handle(envelope));
-    this.router = new CaptureRouter(this.diary, () => this.channelManager.getStatuses());
+    this.router = new CaptureRouter(this.diary, () => this.channelManager.getStatuses(), {
+      getLocale: () => this.locale(),
+      getStorage: () => this.settings.storage,
+    });
     this.settingTab = new DiarySettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
 
@@ -29,16 +33,16 @@ class OmnichannelDiaryPlugin extends Plugin {
     });
     this.addCommand({
       id: "capture-text-or-link",
-      name: "保存文字或网页链接",
+      name: this.t("保存文字或网页链接", "Save text or a web link"),
       callback: () => new ManualCaptureModal(this.app, this).open(),
     });
     this.addCommand({
       id: "restart-enabled-channels",
-      name: "重新连接已启用渠道",
+      name: this.t("重新连接已启用渠道", "Reconnect enabled channels"),
       callback: async () => {
         await this.channelManager.stopAll();
         await this.channelManager.startEnabled();
-        new Notice("Omnichannel Diary 已重新连接渠道");
+        new Notice(this.t("Omnichannel Diary 已重新连接渠道", "Omnichannel Diary channels reconnected"));
       },
     });
     this.app.workspace.onLayoutReady(() => void this.channelManager.startEnabled());
@@ -52,6 +56,14 @@ class OmnichannelDiaryPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  locale() {
+    return appLocale(this.app, this.settings?.ui?.language || "auto");
+  }
+
+  t(zh, en, values = {}) {
+    return translate(this.locale(), zh, en, values);
+  }
+
   dataPath(name) {
     return this.channelDataPath(name, true);
   }
@@ -59,7 +71,7 @@ class OmnichannelDiaryPlugin extends Plugin {
   channelDataPath(name, create = false) {
     const adapter = this.app.vault.adapter;
     const basePath = typeof adapter.getBasePath === "function" ? adapter.getBasePath() : adapter.basePath;
-    if (!basePath) throw new Error("当前 Vault 适配器不支持本地数据目录");
+    if (!basePath) throw new Error(this.t("当前 Vault 适配器不支持本地数据目录", "The current Vault adapter does not support a local data directory"));
     const directory = path.join(basePath, this.app.vault.configDir, "plugins", this.manifest.id, ".channel-data", name);
     if (create) fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     return directory;

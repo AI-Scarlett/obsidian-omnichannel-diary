@@ -26,13 +26,13 @@ class SlackChannel extends BaseChannel {
     const opened = await this.webApi("apps.connections.open", {}, this.config.appToken);
     if (!this.running) return;
     this.socket = new WebSocket(opened.url);
-    this.socket.on("open", () => this.setState("connected", "Socket Mode 在线"));
+    this.socket.on("open", () => this.setState("connected", this.t("Socket Mode 在线", "Socket Mode online")));
     this.socket.on("message", (data) => void this.onSocketMessage(data));
     this.socket.on("error", (error) => this.setState("error", error.message));
     this.socket.on("close", () => {
       this.socket = null;
       if (this.running) {
-        this.setState("connecting", "正在重新连接");
+        this.setState("connecting", this.t("正在重新连接", "Reconnecting"));
         this.reconnectTimer = setTimeout(() => void this.connect().catch((error) => this.setState("error", error.message)), 3_000);
       }
     });
@@ -57,8 +57,8 @@ class SlackChannel extends BaseChannel {
       id: event.client_msg_id || event.ts,
       timestamp: new Date(Number(event.ts) * 1000),
       senderId: event.user || "slack-user",
-      senderName: event.user_profile?.display_name || event.user_profile?.real_name || event.user || "Slack 用户",
-      chatName: event.channel || "Slack 会话",
+      senderName: event.user_profile?.display_name || event.user_profile?.real_name || event.user || this.t("Slack 用户", "Slack user"),
+      chatName: event.channel || this.t("Slack 会话", "Slack conversation"),
       isGroup: event.channel_type !== "im",
       text: event.text || "",
       attachments: files,
@@ -69,7 +69,7 @@ class SlackChannel extends BaseChannel {
   async start() {
     this.assertFields(["appToken", "botToken"]);
     this.running = true;
-    this.setState("connecting", "正在连接 Socket Mode");
+    this.setState("connecting", this.t("正在连接 Socket Mode", "Connecting to Socket Mode"));
     await this.connect();
   }
 

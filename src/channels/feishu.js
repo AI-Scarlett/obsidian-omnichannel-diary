@@ -27,7 +27,7 @@ class FeishuChannel extends BaseChannel {
   }
 
   async beginRegistration(callbacks = {}) {
-    callbacks.onStatus?.("等待飞书 / Lark 官方授权…");
+    callbacks.onStatus?.(this.t("等待飞书 / Lark 官方授权…", "Waiting for official Feishu / Lark authorization…"));
     if (Lark.defaultHttpInstance?.defaults) Lark.defaultHttpInstance.defaults.adapter = "http";
     const controller = new AbortController();
     this.registrationAbort = controller;
@@ -39,9 +39,9 @@ class FeishuChannel extends BaseChannel {
         signal: controller.signal,
         onQRCodeReady: (info) => {
           callbacks.onQr?.(info.url);
-          callbacks.onStatus?.("请扫码并按页面提示授权创建应用");
+          callbacks.onStatus?.(this.t("请扫码并按页面提示授权创建应用", "Scan the QR code and follow the page to authorize app creation"));
         },
-        onStatusChange: (info) => callbacks.onStatus?.(`授权状态：${info.status || info}`),
+        onStatusChange: (info) => callbacks.onStatus?.(this.t("授权状态：{status}", "Authorization status: {status}", { status: info.status || info })),
       });
     } finally {
       if (this.registrationAbort === controller) this.registrationAbort = null;
@@ -50,7 +50,7 @@ class FeishuChannel extends BaseChannel {
     this.config.appSecret = result.client_secret;
     this.config.enabled = true;
     await this.context.saveSettings();
-    callbacks.onStatus?.("飞书应用已创建并保存");
+    callbacks.onStatus?.(this.t("飞书应用已创建并保存", "Feishu / Lark app created and saved"));
     return this.config;
   }
 
@@ -88,7 +88,7 @@ class FeishuChannel extends BaseChannel {
       timestamp: new Date(Number(message.create_time || 0) || Date.now()),
       senderId,
       senderName: senderId,
-      chatName: message.chat_id || "飞书私聊",
+      chatName: message.chat_id || this.t("飞书私聊", "Feishu direct message"),
       isGroup: message.chat_type === "group",
       text,
       attachments,
@@ -108,14 +108,14 @@ class FeishuChannel extends BaseChannel {
     this.wsClient = new Lark.WSClient({
       ...baseConfig,
       loggerLevel: Lark.LoggerLevel.error,
-      onReady: () => this.setState("connected", this.config.domain === "lark" ? "Lark 长连接在线" : "飞书长连接在线"),
+      onReady: () => this.setState("connected", this.config.domain === "lark" ? this.t("Lark 长连接在线", "Lark persistent connection online") : this.t("飞书长连接在线", "Feishu persistent connection online")),
       onError: (error) => this.setState("error", error?.message || String(error)),
-      onReconnecting: () => this.setState("connecting", "正在重新连接"),
+      onReconnecting: () => this.setState("connecting", this.t("正在重新连接", "Reconnecting")),
     });
     const dispatcher = new Lark.EventDispatcher({}).register({
       "im.message.receive_v1": async (data) => this.deliver(this.normalize(data)),
     });
-    this.setState("connecting", "正在建立飞书长连接");
+    this.setState("connecting", this.t("正在建立飞书长连接", "Starting Feishu / Lark persistent connection"));
     await this.wsClient.start({ eventDispatcher: dispatcher });
   }
 

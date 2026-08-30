@@ -28,7 +28,7 @@ class ChannelManager {
     this.plugin = plugin;
     this.onMessage = onMessage;
     this.instances = new Map();
-    this.statuses = Object.fromEntries(CHANNEL_IDS.map((id) => [id, { state: "stopped", detail: "未启用" }]));
+    this.statuses = Object.fromEntries(CHANNEL_IDS.map((id) => [id, { state: "stopped", detail: plugin.t("未启用", "Disabled") }]));
     this.listeners = new Set();
   }
 
@@ -41,6 +41,8 @@ class ChannelManager {
       },
       saveSettings: () => this.plugin.saveSettings(),
       dataPath: (name) => this.plugin.dataPath(name),
+      getLocale: () => this.plugin.locale(),
+      t: (zh, en, values) => this.plugin.t(zh, en, values),
     };
   }
 
@@ -55,7 +57,7 @@ class ChannelManager {
 
   create(id) {
     const ChannelClass = CHANNEL_CLASSES[id];
-    if (!ChannelClass) throw new Error(`Unsupported channel: ${id}`);
+    if (!ChannelClass) throw new Error(this.plugin.t("不支持的渠道：{id}", "Unsupported channel: {id}", { id }));
     return new ChannelClass(this.plugin.settings.channels[id], this.context());
   }
 
@@ -78,7 +80,10 @@ class ChannelManager {
     const instance = this.instances.get(id);
     if (instance) await instance.stop();
     this.instances.delete(id);
-    this.statuses[id] = { state: "stopped", detail: this.plugin.settings.channels[id]?.enabled ? "已停止" : "未启用" };
+    this.statuses[id] = {
+      state: "stopped",
+      detail: this.plugin.settings.channels[id]?.enabled ? this.plugin.t("已停止", "Stopped") : this.plugin.t("未启用", "Disabled"),
+    };
     for (const listener of this.listeners) listener(this.getStatuses());
   }
 
@@ -99,7 +104,9 @@ class ChannelManager {
   }
 
   async pair(id, callbacks) {
-    if (!["wechat", "feishu", "whatsapp"].includes(id)) throw new Error("此渠道的官方 Bot 接口不提供扫码授权");
+    if (!["wechat", "feishu", "whatsapp"].includes(id)) {
+      throw new Error(this.plugin.t("此渠道的官方 Bot 接口不提供扫码授权", "This channel's official bot API does not support QR authorization"));
+    }
     await this.stop(id);
     this.plugin.settings.channels[id].enabled = true;
     await this.plugin.saveSettings();

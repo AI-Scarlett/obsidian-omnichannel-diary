@@ -25,6 +25,7 @@ class WhatsAppChannel extends BaseChannel {
     this.child = runtime;
     runtime.done = runWhatsAppWorker({
       authDir,
+      locale: this.locale(),
       send: (packet) => void this.onWorkerMessage(packet),
       onMessage: (handler) => {
         runtime.handler = handler;
@@ -53,20 +54,20 @@ class WhatsAppChannel extends BaseChannel {
 
   async onWorkerMessage(packet) {
     if (packet?.type === "qr") {
-      this.setState("pairing", "等待 WhatsApp 扫码");
+      this.setState("pairing", this.t("等待 WhatsApp 扫码", "Waiting for WhatsApp QR scan"));
       this.pairingCallbacks?.onQr?.(packet.value);
-      this.pairingCallbacks?.onStatus?.("打开 WhatsApp → 设置 → 已关联设备 → 关联设备，然后扫码");
+      this.pairingCallbacks?.onStatus?.(this.t("打开 WhatsApp → 设置 → 已关联设备 → 关联设备，然后扫码", "Open WhatsApp → Settings → Linked Devices → Link a Device, then scan the QR code"));
       return;
     }
     if (packet?.type === "status") {
       this.setState(packet.state, packet.detail || "");
       this.pairingCallbacks?.onStatus?.(packet.detail || packet.state);
       if (packet.state === "connected") this.settlePairing();
-      if (packet.state === "error") this.settlePairing(new Error(packet.detail || "WhatsApp 连接失败"));
+      if (packet.state === "error") this.settlePairing(new Error(packet.detail || this.t("WhatsApp 连接失败", "WhatsApp connection failed")));
       return;
     }
     if (packet?.type === "fatal") {
-      const message = packet.message || "WhatsApp 连接失败";
+      const message = packet.message || this.t("WhatsApp 连接失败", "WhatsApp connection failed");
       this.setState("error", message);
       this.pairingCallbacks?.onStatus?.(message);
       this.settlePairing(new Error(message));
@@ -81,9 +82,9 @@ class WhatsAppChannel extends BaseChannel {
         fileName: item.fileName,
         mimeType: item.mimeType,
         buffer: Buffer.from(item.base64, "base64"),
-      } : { fileName: item.fileName, load: async () => { throw new Error(item.error || "WhatsApp 附件不可用"); } }),
+      } : { fileName: item.fileName, load: async () => { throw new Error(item.error || this.t("WhatsApp 附件不可用", "WhatsApp attachment unavailable")); } }),
       reply: async (text) => {
-        if (!this.child) throw new Error("WhatsApp 连接不可用");
+        if (!this.child) throw new Error(this.t("WhatsApp 连接不可用", "WhatsApp connection unavailable"));
         await this.child.postMessage({ type: "reply", jid: value.replyTarget, text });
       },
     });
@@ -95,9 +96,9 @@ class WhatsAppChannel extends BaseChannel {
       await this.stopChild();
     }
     this.running = true;
-    callbacks.onStatus?.("正在启动 WhatsApp 官方关联设备流程…");
+    callbacks.onStatus?.(this.t("正在启动 WhatsApp 官方关联设备流程…", "Starting the official WhatsApp linked-device flow…"));
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => this.settlePairing(new Error("WhatsApp 扫码等待超时，请重新生成二维码")), 8 * 60_000);
+      const timer = setTimeout(() => this.settlePairing(new Error(this.t("WhatsApp 扫码等待超时，请重新生成二维码", "WhatsApp QR scan timed out. Generate a new QR code"))), 8 * 60_000);
       this.pairingRequest = { resolve, reject, timer };
       try { this.spawn(); }
       catch (error) { this.settlePairing(error); }
@@ -106,13 +107,13 @@ class WhatsAppChannel extends BaseChannel {
 
   async start() {
     this.running = true;
-    this.setState("connecting", "正在启动 WhatsApp 内置连接");
+    this.setState("connecting", this.t("正在启动 WhatsApp 内置连接", "Starting the built-in WhatsApp connection"));
     this.spawn();
   }
 
   async stop() {
     this.running = false;
-    this.settlePairing(new Error("WhatsApp 连接已取消"));
+    this.settlePairing(new Error(this.t("WhatsApp 连接已取消", "WhatsApp connection cancelled")));
     await this.stopChild();
     this.pairingCallbacks = null;
     this.setState("stopped");

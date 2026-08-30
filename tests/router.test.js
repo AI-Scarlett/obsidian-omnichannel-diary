@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { CaptureRouter, HELP_TEXT, formatCaptureReceipt } = require("../src/core/router");
+const { CaptureRouter, HELP_TEXT, formatCaptureReceipt, formatHelpText } = require("../src/core/router");
 const { CHANNEL_IDS } = require("../src/core/settings");
 
 test("help and status are deterministic and never invoke capture", async () => {
@@ -14,6 +14,22 @@ test("help and status are deterministic and never invoke capture", async () => {
   assert.equal(captures, 0);
   assert.equal(replies[0], HELP_TEXT);
   assert.match(replies[1], /1 个渠道在线/);
+});
+
+test("help and status follow the user's English language choice", async () => {
+  const replies = [];
+  const router = new CaptureRouter({ capture: async () => assert.fail("help must not capture") }, () => ({ telegram: { state: "connected" } }), {
+    getLocale: () => "en",
+    getStorage: () => ({ diaryFolder: "Notes/Daily" }),
+    replyRetryDelays: [0],
+  });
+  await router.handle({ text: "help", reply: async (text) => replies.push(text) });
+  await router.handle({ text: "/status", reply: async (text) => replies.push(text) });
+  assert.equal(replies[0], formatHelpText("en", { diaryFolder: "Notes/Daily" }));
+  assert.match(replies[0], /quick-capture Agent/);
+  assert.match(replies[0], /“Notes\/Daily” folder/);
+  assert.match(replies[1], /1 channel online/);
+  assert.doesNotMatch(replies.join("\n"), /[\u4e00-\u9fff]/);
 });
 
 test("clip command passes only the URL to diary capture", async () => {
@@ -55,6 +71,37 @@ test("capture receipts use the same friendly format across all nine channels", a
     "嗨~ 我是你的随手记 Agent ✍️",
     "想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取正文存成一篇 Markdown 剪藏，并在今天的笔记里留入口。记的东西在 Obsidian 的「日记」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。",
   ].join("\n"));
+});
+
+test("English capture receipts are friendly and identical across all nine channels", async () => {
+  const replies = [];
+  const diary = {
+    capture: async (envelope) => ({
+      diaryPath: "Daily/2026-08-30.md",
+      diaryFolder: "Daily",
+      clippingFolder: "Clippings",
+      messageKey: `${envelope.channel}:english`,
+      clips: [{
+        notePath: "Clippings/article.md",
+        article: { title: "A practical guide to local-first capture", extractionStatus: "complete" },
+        savedImages: 1,
+        imageFailures: [],
+      }],
+      clipFailures: [],
+      attachmentFailures: [],
+    }),
+    queueReceipt: async () => {},
+    completeReceipt: async () => {},
+  };
+  const router = new CaptureRouter(diary, () => ({}), { getLocale: () => "en", replyRetryDelays: [0] });
+  for (const channel of CHANNEL_IDS) {
+    await router.handle({ channel, text: "https://example.com", reply: async (text) => replies.push(text) });
+  }
+  assert.equal(new Set(replies).size, 1);
+  assert.equal(replies.length, 9);
+  assert.match(replies[0], /^🔖 “A practical guide to local-first capture” was saved to “Clippings” with the full text and 1 image\./);
+  assert.match(replies[0], /Hi! I'm your quick-capture Agent/);
+  assert.doesNotMatch(replies[0], /[\u4e00-\u9fff]/);
 });
 
 test("reply retries and clears the durable receipt only after delivery", async () => {

@@ -1,18 +1,31 @@
 "use strict";
 
+const { normalizeLanguagePreference } = require("./i18n");
+
 const CHANNEL_IDS = ["wechat", "feishu", "dingtalk", "wecom", "qq", "slack", "telegram", "discord", "whatsapp"];
 
 const CHANNEL_META = {
-  wechat: { name: "微信", mark: "微", setup: "官方扫码授权" },
-  feishu: { name: "飞书 / Lark", mark: "飞", setup: "官方扫码创建应用 / 应用凭据" },
-  dingtalk: { name: "钉钉", mark: "钉", setup: "官方应用凭据" },
-  wecom: { name: "企业微信", mark: "企", setup: "官方机器人凭据" },
-  qq: { name: "QQ", mark: "Q", setup: "官方开放平台凭据" },
-  slack: { name: "Slack", mark: "S", setup: "官方 Socket Mode 令牌" },
-  telegram: { name: "Telegram", mark: "T", setup: "官方 BotFather 令牌" },
-  discord: { name: "Discord", mark: "D", setup: "官方 Bot 令牌" },
-  whatsapp: { name: "WhatsApp", mark: "W", setup: "官方关联设备扫码" },
+  wechat: { name: "微信", enName: "WeChat", mark: "微", enMark: "W", setup: "官方扫码授权", enSetup: "Official QR authorization" },
+  feishu: { name: "飞书 / Lark", enName: "Feishu / Lark", mark: "飞", enMark: "F", setup: "官方扫码创建应用 / 应用凭据", enSetup: "Official QR app setup / credentials" },
+  dingtalk: { name: "钉钉", enName: "DingTalk", mark: "钉", enMark: "D", setup: "官方应用凭据", enSetup: "Official app credentials" },
+  wecom: { name: "企业微信", enName: "WeCom", mark: "企", enMark: "W", setup: "官方机器人凭据", enSetup: "Official bot credentials" },
+  qq: { name: "QQ", enName: "QQ", mark: "Q", enMark: "Q", setup: "官方开放平台凭据", enSetup: "Official Open Platform credentials" },
+  slack: { name: "Slack", enName: "Slack", mark: "S", enMark: "S", setup: "官方 Socket Mode 令牌", enSetup: "Official Socket Mode tokens" },
+  telegram: { name: "Telegram", enName: "Telegram", mark: "T", enMark: "T", setup: "官方 BotFather 令牌", enSetup: "Official BotFather token" },
+  discord: { name: "Discord", enName: "Discord", mark: "D", enMark: "D", setup: "官方 Bot 令牌", enSetup: "Official bot token" },
+  whatsapp: { name: "WhatsApp", enName: "WhatsApp", mark: "W", enMark: "W", setup: "官方关联设备扫码", enSetup: "Official linked-device QR" },
 };
+
+function getChannelMeta(id, locale = "zh-CN") {
+  const meta = CHANNEL_META[id];
+  if (!meta) return { name: id, setup: "", mark: "?" };
+  return {
+    ...meta,
+    name: locale === "en" ? meta.enName : meta.name,
+    mark: locale === "en" ? meta.enMark : meta.mark,
+    setup: locale === "en" ? meta.enSetup : meta.setup,
+  };
+}
 
 const REQUIRED_CREDENTIALS = {
   wechat: ["token"],
@@ -27,6 +40,7 @@ const REQUIRED_CREDENTIALS = {
 
 const DEFAULT_SETTINGS = {
   schemaVersion: 1,
+  ui: { language: "auto" },
   storage: {
     diaryFolder: "Omnichannel Diary/Daily",
     clippingFolder: "Omnichannel Diary/Clippings",
@@ -77,6 +91,7 @@ function normalizeSettings(saved) {
   value.storage.clippingFolder = sanitizeFolder(value.storage.clippingFolder, DEFAULT_SETTINGS.storage.clippingFolder);
   value.storage.attachmentFolder = sanitizeFolder(value.storage.attachmentFolder, DEFAULT_SETTINGS.storage.attachmentFolder);
   value.capture.maxFileMb = Math.min(100, Math.max(1, Number(value.capture.maxFileMb) || 20));
+  value.ui.language = normalizeLanguagePreference(value.ui.language);
   value.runtime.recentMessageIds = Array.isArray(value.runtime.recentMessageIds) ? value.runtime.recentMessageIds.slice(-500) : [];
   value.runtime.pendingReceipts = Array.isArray(value.runtime.pendingReceipts)
     ? value.runtime.pendingReceipts.filter((item) => item && typeof item.id === "string" && typeof item.text === "string").slice(-100)
@@ -95,6 +110,7 @@ function migrateLegacySettings(saved) {
   const ilink = saved.ilink || {};
   const migrated = {
     schemaVersion: 1,
+    ui: { language: "auto" },
     storage: {
       diaryFolder: legacySettings.diaryFolder || DEFAULT_SETTINGS.storage.diaryFolder,
       clippingFolder: legacySettings.webClipFolder || DEFAULT_SETTINGS.storage.clippingFolder,
@@ -136,4 +152,4 @@ function clearChannelCredentials(settings, channelId) {
   settings.channels[channelId] = deepMerge(DEFAULT_SETTINGS.channels[channelId], {});
 }
 
-module.exports = { CHANNEL_IDS, CHANNEL_META, DEFAULT_SETTINGS, clearChannelCredentials, migrateLegacySettings, normalizeSettings };
+module.exports = { CHANNEL_IDS, CHANNEL_META, DEFAULT_SETTINGS, clearChannelCredentials, getChannelMeta, migrateLegacySettings, normalizeSettings };

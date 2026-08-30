@@ -44,8 +44,8 @@ class WeComChannel extends BaseChannel {
       id: message.msgid,
       timestamp: new Date(Number(message.create_time || 0) * 1000 || Date.now()),
       senderId: message.from?.userid || "wecom-user",
-      senderName: message.from?.userid || "企业微信用户",
-      chatName: message.chatid || "企业微信私聊",
+      senderName: message.from?.userid || this.t("企业微信用户", "WeCom user"),
+      chatName: message.chatid || this.t("企业微信私聊", "WeCom direct message"),
       isGroup: message.chattype === "group",
       text,
       attachments,
@@ -58,11 +58,11 @@ class WeComChannel extends BaseChannel {
     this.running = true;
     const quietLogger = { debug() {}, info() {}, warn() {}, error() {} };
     this.client = new WSClient({ botId: this.config.botId, secret: this.config.secret, maxReconnectAttempts: -1, logger: quietLogger });
-    this.client.on("authenticated", () => this.setState("connected", "企业微信长连接在线"));
-    this.client.on("reconnecting", (attempt) => this.setState("connecting", `第 ${attempt} 次重连`));
+    this.client.on("authenticated", () => this.setState("connected", this.t("企业微信长连接在线", "WeCom persistent connection online")));
+    this.client.on("reconnecting", (attempt) => this.setState("connecting", this.t("第 {attempt} 次重连", "Reconnect attempt {attempt}", { attempt })));
     this.client.on("error", (error) => this.setState("error", error?.message || String(error)));
     this.client.on("message", (frame) => void this.deliver(this.normalize(frame)));
-    this.setState("connecting", "正在连接企业微信");
+    this.setState("connecting", this.t("正在连接企业微信", "Connecting to WeCom"));
     this.client.connect();
   }
 

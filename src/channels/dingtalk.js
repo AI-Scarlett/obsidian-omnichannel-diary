@@ -21,8 +21,8 @@ class DingTalkChannel extends BaseChannel {
       id: message.msgId || frame.headers.messageId,
       timestamp: new Date(Number(message.createAt || frame.headers.time) || Date.now()),
       senderId: message.senderStaffId || message.senderId || "dingtalk-user",
-      senderName: message.senderNick || "钉钉用户",
-      chatName: message.conversationId || "钉钉私聊",
+      senderName: message.senderNick || this.t("钉钉用户", "DingTalk user"),
+      chatName: message.conversationId || this.t("钉钉私聊", "DingTalk direct message"),
       isGroup: String(message.conversationType) === "2",
       text: message.text?.content || content.text || message.content?.content || "",
       attachments,
@@ -31,7 +31,7 @@ class DingTalkChannel extends BaseChannel {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ msgtype: "text", text: { content: text } }), accept: "application/json",
         });
-        if (!response.ok) throw new Error(`钉钉回复失败：HTTP ${response.status}`);
+        if (!response.ok) throw new Error(this.t("钉钉回复失败：HTTP {status}", "DingTalk reply failed: HTTP {status}", { status: response.status }));
       } : undefined,
     });
   }
@@ -42,9 +42,9 @@ class DingTalkChannel extends BaseChannel {
     this.client = new DWClient({ clientId: this.config.clientId, clientSecret: this.config.clientSecret, keepAlive: true, debug: false });
     this.client.registerCallbackListener(TOPIC_ROBOT, (frame) => void this.onMessage(frame));
     this.client.on("error", (error) => this.setState("error", error?.message || String(error)));
-    this.setState("connecting", "正在建立 Stream 连接");
+    this.setState("connecting", this.t("正在建立 Stream 连接", "Starting Stream connection"));
     await this.client.connect();
-    this.setState("connected", "钉钉 Stream 在线");
+    this.setState("connected", this.t("钉钉 Stream 在线", "DingTalk Stream online"));
   }
 
   async stop() {

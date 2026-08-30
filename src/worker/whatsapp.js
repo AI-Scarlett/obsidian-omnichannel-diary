@@ -75,6 +75,8 @@ function mediaInfo(content, id) {
 async function runWhatsAppWorker(options = {}) {
   const authDir = options.authDir;
   const emit = options.send;
+  const english = options.locale === "en";
+  const tr = (zh, en) => english ? en : zh;
   if (!authDir) throw new Error("WhatsApp auth directory is missing");
   if (typeof emit !== "function" || typeof options.onMessage !== "function") throw new Error("WhatsApp runtime transport is missing");
   const cacheModule = await import("@cacheable/node-cache");
@@ -121,12 +123,12 @@ async function runWhatsAppWorker(options = {}) {
     socket.ev.on("creds.update", saveCreds);
     socket.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
       if (qr) emit({ type: "qr", value: qr });
-      if (connection === "open") emit({ type: "status", state: "connected", detail: socket.user?.name || socket.user?.id || "WhatsApp 在线" });
+      if (connection === "open") emit({ type: "status", state: "connected", detail: socket.user?.name || socket.user?.id || tr("WhatsApp 在线", "WhatsApp online") });
       if (connection === "close" && !stopped) {
         const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.data?.statusCode;
-        if (code === 401) emit({ type: "status", state: "error", detail: "WhatsApp 登录已失效，请重新扫码" });
+        if (code === 401) emit({ type: "status", state: "error", detail: tr("WhatsApp 登录已失效，请重新扫码", "WhatsApp login expired. Scan a new QR code") });
         else {
-          emit({ type: "status", state: "connecting", detail: "WhatsApp 正在重连" });
+          emit({ type: "status", state: "connecting", detail: tr("WhatsApp 正在重连", "WhatsApp reconnecting") });
           setTimeout(() => void connect().catch((error) => emit({ type: "fatal", message: error?.message || String(error) })), 2_500);
         }
       }
@@ -149,7 +151,7 @@ async function runWhatsAppWorker(options = {}) {
           if (media) {
             const buffer = await baileys.downloadMediaMessage(message, "buffer", {}, { logger, reuploadRequest: socket.updateMediaMessage });
             if (buffer.length <= 25 * 1024 * 1024) attachments.push({ ...media, base64: buffer.toString("base64") });
-            else attachments.push({ ...media, error: "附件超过 25 MB，未保存" });
+            else attachments.push({ ...media, error: tr("附件超过 25 MB，未保存", "Attachment exceeds 25 MB and was not saved") });
           }
           const jid = message.key?.remoteJid || "";
           const fromSelf = Boolean(message.key?.fromMe);
@@ -159,8 +161,8 @@ async function runWhatsAppWorker(options = {}) {
               id,
               timestamp: Number(message.messageTimestamp || 0) * 1000 || Date.now(),
               senderId: fromSelf ? (socket.user?.id || "whatsapp-self") : (message.key?.participant || jid),
-              senderName: fromSelf ? (socket.user?.name || socket.user?.notify || "本人") : (message.pushName || message.key?.participant || jid),
-              chatName: fromSelf ? "给自己发消息" : jid,
+              senderName: fromSelf ? (socket.user?.name || socket.user?.notify || tr("本人", "Me")) : (message.pushName || message.key?.participant || jid),
+              chatName: fromSelf ? tr("给自己发消息", "Message yourself") : jid,
               isGroup: jid.endsWith("@g.us"),
               text: messageText(content),
               attachments,
@@ -168,7 +170,7 @@ async function runWhatsAppWorker(options = {}) {
             },
           });
         } catch (error) {
-          emit({ type: "status", state: "error", detail: `WhatsApp 消息处理失败：${error?.message || error}` });
+          emit({ type: "status", state: "error", detail: `${tr("WhatsApp 消息处理失败：", "WhatsApp message processing failed: ")}${error?.message || error}` });
         }
       }
     });
@@ -181,7 +183,7 @@ async function runWhatsAppWorker(options = {}) {
       try { await socket.sendMessage(message.jid, { text: String(message.text || "") }, { messageId }); }
       catch (error) {
         outboundReplies.forget(messageId);
-        emit({ type: "status", state: "error", detail: `WhatsApp 回复失败：${error?.message || error}` });
+        emit({ type: "status", state: "error", detail: `${tr("WhatsApp 回复失败：", "WhatsApp reply failed: ")}${error?.message || error}` });
         throw error;
       }
     }

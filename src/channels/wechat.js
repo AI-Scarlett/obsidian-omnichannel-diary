@@ -130,28 +130,28 @@ class WeChatChannel extends BaseChannel {
     this.pairingAbort = controller;
     let baseUrl = DEFAULT_BASE_URL;
     try {
-      callbacks.onStatus?.("正在生成微信二维码…");
+      callbacks.onStatus?.(this.t("正在生成微信二维码…", "Generating a WeChat QR code…"));
       const qr = await ilinkJson(baseUrl, "ilink/bot/get_bot_qrcode?bot_type=3", {
         method: "POST",
         body: { local_token_list: this.config.token ? [this.config.token] : [] },
         timeoutMs: 30_000,
         signal: controller.signal,
       });
-      if (!qr.qrcode || !qr.qrcode_img_content) throw new Error("微信服务没有返回二维码");
+      if (!qr.qrcode || !qr.qrcode_img_content) throw new Error(this.t("微信服务没有返回二维码", "WeChat did not return a QR code"));
       callbacks.onQr?.(qr.qrcode_img_content);
-      callbacks.onStatus?.("请用微信扫码并在手机上确认");
+      callbacks.onStatus?.(this.t("请用微信扫码并在手机上确认", "Scan with WeChat and confirm on your phone"));
       const deadline = Date.now() + 8 * 60_000;
       while (Date.now() < deadline && !controller.signal.aborted) {
         const status = await ilinkJson(baseUrl, `ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(qr.qrcode)}`, { timeoutMs: 40_000, signal: controller.signal });
-        if (status.status === "scaned") callbacks.onStatus?.("已扫码，请在微信中确认");
+        if (status.status === "scaned") callbacks.onStatus?.(this.t("已扫码，请在微信中确认", "QR scanned. Confirm in WeChat"));
         if (status.status === "scaned_but_redirect" && status.redirect_host) {
           baseUrl = `https://${String(status.redirect_host).replace(/^https?:\/\//, "")}`;
         } else if (status.status === "need_verifycode" || status.status === "verify_code_blocked") {
-          throw new Error("微信要求输入配对码；请在微信端完成验证后重新扫码");
+          throw new Error(this.t("微信要求输入配对码；请在微信端完成验证后重新扫码", "WeChat requires a pairing code. Complete verification in WeChat, then scan again"));
         } else if (status.status === "expired") {
-          throw new Error("微信二维码已过期，请重新生成");
+          throw new Error(this.t("微信二维码已过期，请重新生成", "The WeChat QR code expired. Generate a new one"));
         } else if (status.status === "confirmed") {
-          if (!status.bot_token) throw new Error("微信确认成功但未返回连接凭据");
+          if (!status.bot_token) throw new Error(this.t("微信确认成功但未返回连接凭据", "WeChat confirmed authorization but returned no connection credentials"));
           Object.assign(this.config, {
             token: status.bot_token,
             accountId: status.ilink_bot_id || "",
@@ -161,13 +161,13 @@ class WeChatChannel extends BaseChannel {
             enabled: true,
           });
           await this.context.saveSettings();
-          callbacks.onStatus?.("微信已连接");
+          callbacks.onStatus?.(this.t("微信已连接", "WeChat connected"));
           return this.config;
         }
         await new Promise((resolve) => setTimeout(resolve, 900));
       }
-      if (controller.signal.aborted) throw new Error("微信连接已取消");
-      throw new Error("微信扫码等待超时");
+      if (controller.signal.aborted) throw new Error(this.t("微信连接已取消", "WeChat connection cancelled"));
+      throw new Error(this.t("微信扫码等待超时", "WeChat QR scan timed out"));
     } finally {
       if (this.pairingAbort === controller) this.pairingAbort = null;
     }
@@ -177,7 +177,7 @@ class WeChatChannel extends BaseChannel {
     this.assertFields(["token"]);
     this.running = true;
     this.abortController = new AbortController();
-    this.setState("connecting", "正在建立长轮询");
+    this.setState("connecting", this.t("正在建立长轮询", "Starting long polling"));
     void this.poll(this.abortController.signal);
   }
 
@@ -189,11 +189,11 @@ class WeChatChannel extends BaseChannel {
           body: { get_updates_buf: this.config.syncBuf || "" }, token: this.config.token, timeoutMs: 50_000, signal,
         });
         await this.processUpdate(result);
-        this.setState("connected", "微信 iLink 在线");
+        this.setState("connected", this.t("微信 iLink 在线", "WeChat iLink online"));
         retryMs = 1_000;
       } catch (error) {
         if (signal.aborted) break;
-        this.setState("error", `微信连接重试中：${error?.message || error}`);
+        this.setState("error", this.t("微信连接重试中：{error}", "Retrying WeChat connection: {error}", { error: error?.message || error }));
         await new Promise((resolve) => setTimeout(resolve, retryMs));
         retryMs = Math.min(30_000, retryMs * 2);
       }
@@ -210,8 +210,8 @@ class WeChatChannel extends BaseChannel {
         id: String(message.message_id || message.seq || `${message.from_user_id}-${message.create_time_ms}`),
         timestamp: new Date(Number(message.create_time_ms) || Date.now()),
         senderId: message.from_user_id || "wechat-user",
-        senderName: message.from_user_id || "微信用户",
-        chatName: message.session_id || "微信私聊",
+        senderName: message.from_user_id || this.t("微信用户", "WeChat user"),
+        chatName: message.session_id || this.t("微信私聊", "WeChat direct message"),
         text: items.map(itemText).filter(Boolean).join("\n"),
         attachments,
         reply: async (text) => ilinkJson(this.config.baseUrl || DEFAULT_BASE_URL, "ilink/bot/sendmessage", {

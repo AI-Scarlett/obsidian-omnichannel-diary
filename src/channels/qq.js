@@ -14,8 +14,8 @@ class QQChannel extends BaseChannel {
     const { QQBot } = await import("@tencent-connect/qqbot-nodejs");
     const logger = { debug() {}, info() {}, warn() {}, error() {} };
     this.bot = new QQBot({ appId: this.config.appId, appSecret: this.config.appSecret, logger, tokenPrefetch: "sync" });
-    this.bot.on("ready", () => this.setState("connected", "QQ Gateway 在线"));
-    this.bot.on("resumed", () => this.setState("connected", "QQ Gateway 已恢复"));
+    this.bot.on("ready", () => this.setState("connected", this.t("QQ Gateway 在线", "QQ Gateway online")));
+    this.bot.on("resumed", () => this.setState("connected", this.t("QQ Gateway 已恢复", "QQ Gateway resumed")));
     this.bot.on("error", (error) => this.setState("error", error?.message || String(error)));
     this.bot.on("message", async (_ctx, message) => {
       if (message.senderIsBot) return;
@@ -23,8 +23,8 @@ class QQChannel extends BaseChannel {
         id: message.messageId,
         timestamp: new Date(message.timestamp),
         senderId: message.senderId,
-        senderName: message.senderName || "QQ 用户",
-        chatName: message.groupOpenid || message.channelId || "QQ 私聊",
+        senderName: message.senderName || this.t("QQ 用户", "QQ user"),
+        chatName: message.groupOpenid || message.channelId || this.t("QQ 私聊", "QQ direct message"),
         isGroup: ["group", "guild"].includes(message.kind),
         mentioned: Boolean(message.mentions?.length),
         text: message.content || "",
@@ -36,7 +36,7 @@ class QQChannel extends BaseChannel {
         reply: async (text) => this.bot.sendText(message.replyTarget, text),
       });
     });
-    this.setState("connecting", "正在连接 QQ Gateway");
+    this.setState("connecting", this.t("正在连接 QQ Gateway", "Connecting to QQ Gateway"));
     void this.bot.start().catch((error) => this.setState("error", error?.message || String(error)));
   }
 

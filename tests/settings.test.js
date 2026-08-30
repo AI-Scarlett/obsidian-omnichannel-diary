@@ -23,6 +23,13 @@ test("saved values are merged, folders normalized, and unknown inherited keys dr
   assert.equal(settings.channels.telegram.botToken, "secret");
   assert.equal(settings.inheritedLegacyKey, undefined);
   assert.deepEqual(settings.runtime.pendingReceipts, []);
+  assert.equal(settings.ui.language, "auto");
+});
+
+test("language choice is preserved and invalid values fall back to Obsidian auto detection", () => {
+  assert.equal(normalizeSettings({ schemaVersion: 1, ui: { language: "en" } }).ui.language, "en");
+  assert.equal(normalizeSettings({ schemaVersion: 1, ui: { language: "zh-cn" } }).ui.language, "zh-CN");
+  assert.equal(normalizeSettings({ schemaVersion: 1, ui: { language: "de" } }).ui.language, "auto");
 });
 
 test("pending receipts are sanitized and bounded for retry after restart", () => {
