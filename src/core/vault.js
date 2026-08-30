@@ -33,6 +33,17 @@ class VaultWriter {
     return this.vault.create(normalized, content);
   }
 
+  async upsertText(filePath, content) {
+    const normalized = normalizePath(filePath);
+    await this.ensureFolder(normalized.split("/").slice(0, -1).join("/"));
+    const existing = this.vault.getAbstractFileByPath(normalized);
+    if (existing) {
+      await this.vault.modify(existing, content);
+      return existing;
+    }
+    return this.vault.create(normalized, content);
+  }
+
   async append(filePath, content, initial = "") {
     const normalized = normalizePath(filePath);
     const previous = this.pending.get(normalized) || Promise.resolve();
@@ -55,6 +66,10 @@ class VaultWriter {
     let path = normalizePath(`${folder}/${fileName}`);
     const existing = this.vault.getAbstractFileByPath(path);
     if (existing) {
+      try {
+        const existingBuffer = Buffer.from(await this.vault.readBinary(existing));
+        if (existingBuffer.equals(buffer)) return path;
+      } catch (_) {}
       const dot = fileName.lastIndexOf(".");
       const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
       const extension = dot > 0 ? fileName.slice(dot) : "";

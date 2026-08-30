@@ -22,6 +22,16 @@ test("saved values are merged, folders normalized, and unknown inherited keys dr
   assert.equal(settings.capture.maxFileMb, 100);
   assert.equal(settings.channels.telegram.botToken, "secret");
   assert.equal(settings.inheritedLegacyKey, undefined);
+  assert.deepEqual(settings.runtime.pendingReceipts, []);
+});
+
+test("pending receipts are sanitized and bounded for retry after restart", () => {
+  const pendingReceipts = Array.from({ length: 105 }, (_, index) => ({ id: `wechat:${index}`, text: `receipt ${index}`, ignored: true }));
+  pendingReceipts.push({ id: 42, text: "invalid" });
+  const settings = normalizeSettings({ schemaVersion: 1, runtime: { pendingReceipts } });
+  assert.equal(settings.runtime.pendingReceipts.length, 100);
+  assert.equal(settings.runtime.pendingReceipts[0].id, "wechat:5");
+  assert.equal(settings.runtime.pendingReceipts.at(-1).text, "receipt 104");
 });
 
 test("clearing a channel resets credentials and disables it", () => {

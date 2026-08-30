@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS = {
     discord: { enabled: false, botToken: "" },
     whatsapp: { enabled: false },
   },
-  runtime: { recentMessageIds: [] },
+  runtime: { recentMessageIds: [], pendingReceipts: [] },
 };
 
 function deepMerge(defaults, saved) {
@@ -78,6 +78,9 @@ function normalizeSettings(saved) {
   value.storage.attachmentFolder = sanitizeFolder(value.storage.attachmentFolder, DEFAULT_SETTINGS.storage.attachmentFolder);
   value.capture.maxFileMb = Math.min(100, Math.max(1, Number(value.capture.maxFileMb) || 20));
   value.runtime.recentMessageIds = Array.isArray(value.runtime.recentMessageIds) ? value.runtime.recentMessageIds.slice(-500) : [];
+  value.runtime.pendingReceipts = Array.isArray(value.runtime.pendingReceipts)
+    ? value.runtime.pendingReceipts.filter((item) => item && typeof item.id === "string" && typeof item.text === "string").slice(-100)
+    : [];
   for (const [id, fields] of Object.entries(REQUIRED_CREDENTIALS)) {
     if (value.channels[id].enabled && fields.some((field) => !String(value.channels[id][field] || "").trim())) {
       value.channels[id].enabled = false;
@@ -124,7 +127,7 @@ function migrateLegacySettings(saved) {
       discord: { enabled: Boolean(legacyChannels.discord?.enabled), botToken: "" },
       whatsapp: { enabled: Boolean(legacyChannels.whatsapp?.enabled) },
     },
-    runtime: { recentMessageIds: [] },
+    runtime: { recentMessageIds: [], pendingReceipts: [] },
   };
   return migrated;
 }

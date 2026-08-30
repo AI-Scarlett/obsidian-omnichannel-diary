@@ -17,7 +17,7 @@ class OmnichannelDiaryPlugin extends Plugin {
     this.migrateLegacyRuntimeData();
     if (JSON.stringify(saved || {}) !== JSON.stringify(this.settings)) await this.saveSettings();
     this.writer = new VaultWriter(this.app.vault);
-    this.diary = new DiaryService(this.writer, () => this.settings, () => void this.saveSettings());
+    this.diary = new DiaryService(this.writer, () => this.settings, () => this.saveSettings());
     this.channelManager = new ChannelManager(this, async (envelope) => this.router.handle(envelope));
     this.router = new CaptureRouter(this.diary, () => this.channelManager.getStatuses());
     this.settingTab = new DiarySettingTab(this.app, this);

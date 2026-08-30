@@ -18,8 +18,8 @@ class WhatsAppChannel extends BaseChannel {
       handler: null,
       queue: [],
       postMessage(message) {
-        if (this.handler) void this.handler(message);
-        else this.queue.push(message);
+        if (this.handler) return Promise.resolve().then(() => this.handler(message));
+        return new Promise((resolve, reject) => this.queue.push({ message, resolve, reject }));
       },
     };
     this.child = runtime;
@@ -28,7 +28,9 @@ class WhatsAppChannel extends BaseChannel {
       send: (packet) => void this.onWorkerMessage(packet),
       onMessage: (handler) => {
         runtime.handler = handler;
-        for (const message of runtime.queue.splice(0)) void handler(message);
+        for (const pending of runtime.queue.splice(0)) {
+          Promise.resolve().then(() => handler(pending.message)).then(pending.resolve, pending.reject);
+        }
       },
       stop() {},
     }).catch((error) => {
@@ -80,7 +82,10 @@ class WhatsAppChannel extends BaseChannel {
         mimeType: item.mimeType,
         buffer: Buffer.from(item.base64, "base64"),
       } : { fileName: item.fileName, load: async () => { throw new Error(item.error || "WhatsApp 附件不可用"); } }),
-      reply: async (text) => this.child?.postMessage({ type: "reply", jid: value.replyTarget, text }),
+      reply: async (text) => {
+        if (!this.child) throw new Error("WhatsApp 连接不可用");
+        await this.child.postMessage({ type: "reply", jid: value.replyTarget, text });
+      },
     });
   }
 
@@ -116,7 +121,7 @@ class WhatsAppChannel extends BaseChannel {
   async stopChild() {
     const runtime = this.child;
     if (!runtime) return;
-    runtime.postMessage({ type: "stop" });
+    void runtime.postMessage({ type: "stop" });
     await Promise.race([runtime.done, new Promise((resolve) => setTimeout(resolve, 1_500))]);
     if (this.child === runtime) this.child = null;
   }

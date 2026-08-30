@@ -74,6 +74,46 @@ function cleanMarkdown(value) {
   return String(value || "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+function normalizedText(node) {
+  return String(node?.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function metaContent(document, selector) {
+  return String(document.querySelector(selector)?.getAttribute("content") || "").trim();
+}
+
+function selectArticle(document, finalUrl) {
+  const hostname = new URL(finalUrl).hostname.toLowerCase();
+  const wechatContent = hostname === "mp.weixin.qq.com" ? document.querySelector("#js_content") : null;
+  if (wechatContent && normalizedText(wechatContent).length >= 40) {
+    const title = normalizedText(document.querySelector("#activity-name"))
+      || metaContent(document, 'meta[property="og:title"]')
+      || document.title
+      || hostname;
+    const byline = normalizedText(document.querySelector("#js_author_name"))
+      || metaContent(document, 'meta[name="author"]');
+    const siteName = normalizedText(document.querySelector("#js_name")) || "微信公众号";
+    const plainText = normalizedText(wechatContent);
+    return {
+      title,
+      byline,
+      excerpt: metaContent(document, 'meta[property="og:description"]') || plainText.slice(0, 240),
+      siteName,
+      content: wechatContent.innerHTML,
+      extractionMethod: "wechat-article",
+    };
+  }
+  const article = new Readability(document.cloneNode(true), { charThreshold: 40 }).parse();
+  return {
+    title: article?.title || document.title || hostname,
+    byline: article?.byline || "",
+    excerpt: article?.excerpt || "",
+    siteName: article?.siteName || hostname,
+    content: article?.content || document.body?.innerHTML || "",
+    extractionMethod: article?.content ? "readability" : "document-body",
+  };
+}
+
 class WebClipper {
   constructor(writer, settings) {
     this.writer = writer;
@@ -88,8 +128,8 @@ class WebClipper {
     const html = (await readLimitedBody(response, 5 * 1024 * 1024)).toString("utf8");
     const { document } = parseHTML(html);
     prepareDocument(document, finalUrl);
-    const article = new Readability(document.cloneNode(true), { charThreshold: 40 }).parse();
-    const sourceHtml = article?.content || document.body?.innerHTML || "";
+    const article = selectArticle(document, finalUrl);
+    const sourceHtml = article.content;
     const { document: articleDocument } = parseHTML(`<!doctype html><html><head></head><body>${sourceHtml}</body></html>`);
     prepareDocument(articleDocument, finalUrl);
     for (const image of articleDocument.querySelectorAll("img[src]")) {
@@ -97,14 +137,18 @@ class WebClipper {
     }
     const images = [...articleDocument.querySelectorAll("img[src]")].map((image) => image.getAttribute("src")).filter(Boolean);
     const markdown = cleanMarkdown(nodeToMarkdown(articleDocument.body));
+    const contentChars = normalizedText(articleDocument.body).length;
     return {
       url: finalUrl,
-      title: article?.title || document.title || new URL(finalUrl).hostname,
-      byline: article?.byline || "",
-      excerpt: article?.excerpt || "",
-      siteName: article?.siteName || new URL(finalUrl).hostname,
+      title: article.title,
+      byline: article.byline,
+      excerpt: article.excerpt,
+      siteName: article.siteName,
       markdown,
       images: [...new Set(images)],
+      contentChars,
+      extractionMethod: article.extractionMethod,
+      extractionStatus: contentChars >= 120 ? "complete" : "partial",
     };
   }
 
@@ -146,9 +190,11 @@ class WebClipper {
       "",
     ].join("\n");
     const report = failures.length ? `\n\n> [!warning] ${failures.length} 张图片未能本地保存，正文中保留远程地址。` : "";
-    await this.writer.createText(notePath, `${frontmatter}# ${article.title}\n\n${markdown}${report}\n`);
+    const content = `${frontmatter}# ${article.title}\n\n${markdown}${report}\n`;
+    if (typeof this.writer.upsertText === "function") await this.writer.upsertText(notePath, content);
+    else await this.writer.createText(notePath, content);
     return { notePath, article, savedImages, imageFailures: failures };
   }
 }
 
-module.exports = { WebClipper, absoluteUrl, bestSrcset, cleanMarkdown, isLikelyContentImage, nodeToMarkdown, prepareDocument };
+module.exports = { WebClipper, absoluteUrl, bestSrcset, cleanMarkdown, isLikelyContentImage, nodeToMarkdown, normalizedText, prepareDocument, selectArticle };

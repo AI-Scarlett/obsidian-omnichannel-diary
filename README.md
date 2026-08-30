@@ -11,6 +11,8 @@ Version 0.3.x is an independent implementation. It does not contain source code 
 - Chat attachments and web images are downloaded into `Omnichannel Diary/Attachments`.
 - Every entry identifies the channel, conversation, message ID, and any download failure.
 - If page extraction or an image download fails, the original URL remains in the daily note.
+- WeChat and WhatsApp use the same deterministic receipt text. Receipts are retried and kept pending locally until the channel confirms that they were sent.
+- WeChat messages are marked processed and its polling cursor is advanced only after the Vault write succeeds.
 
 All folders and capture rules are configurable.
 

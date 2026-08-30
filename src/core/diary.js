@@ -11,14 +11,42 @@ class DiaryService {
     this.onSettingsChanged = onSettingsChanged;
   }
 
+  messageKey(envelope) {
+    return `${envelope.channel}:${envelope.id || shortHash(`${envelope.timestamp}:${envelope.senderId}:${envelope.text}`)}`;
+  }
+
   isDuplicate(envelope) {
     const settings = this.getSettings();
-    const key = `${envelope.channel}:${envelope.id || shortHash(`${envelope.timestamp}:${envelope.senderId}:${envelope.text}`)}`;
-    if (settings.runtime.recentMessageIds.includes(key)) return true;
-    settings.runtime.recentMessageIds.push(key);
+    return settings.runtime.recentMessageIds.includes(this.messageKey(envelope));
+  }
+
+  pendingReceipt(key) {
+    return this.getSettings().runtime.pendingReceipts.find((item) => item.id === key)?.text || "";
+  }
+
+  async remember(key) {
+    const settings = this.getSettings();
+    if (!settings.runtime.recentMessageIds.includes(key)) settings.runtime.recentMessageIds.push(key);
     settings.runtime.recentMessageIds = settings.runtime.recentMessageIds.slice(-500);
-    this.onSettingsChanged();
-    return false;
+    const retained = new Set(settings.runtime.recentMessageIds);
+    settings.runtime.pendingReceipts = settings.runtime.pendingReceipts.filter((item) => retained.has(item.id));
+    await this.onSettingsChanged();
+  }
+
+  async queueReceipt(key, text) {
+    const settings = this.getSettings();
+    settings.runtime.pendingReceipts = settings.runtime.pendingReceipts.filter((item) => item.id !== key);
+    settings.runtime.pendingReceipts.push({ id: key, text: String(text), createdAt: new Date().toISOString() });
+    settings.runtime.pendingReceipts = settings.runtime.pendingReceipts.slice(-100);
+    await this.onSettingsChanged();
+  }
+
+  async completeReceipt(key) {
+    const settings = this.getSettings();
+    const next = settings.runtime.pendingReceipts.filter((item) => item.id !== key);
+    if (next.length === settings.runtime.pendingReceipts.length) return;
+    settings.runtime.pendingReceipts = next;
+    await this.onSettingsChanged();
   }
 
   async materializeAttachment(attachment, folder, index) {
@@ -47,7 +75,8 @@ class DiaryService {
     const settings = this.getSettings();
     if (envelope.isGroup && !settings.capture.includeGroupMessages) return { ignored: "group-disabled" };
     if (envelope.isGroup && settings.capture.requireMentionInGroups && !envelope.mentioned) return { ignored: "mention-required" };
-    if (this.isDuplicate(envelope)) return { ignored: "duplicate" };
+    const messageKey = this.messageKey(envelope);
+    if (this.isDuplicate(envelope)) return { ignored: "duplicate", messageKey, pendingReceipt: this.pendingReceipt(messageKey) };
 
     const date = localDateParts(envelope.timestamp || new Date());
     const diaryPath = `${settings.storage.diaryFolder}/${date.day}.md`;
@@ -91,7 +120,8 @@ class DiaryService {
     lines.push("");
     const initial = `---\ndate: ${date.day}\ntags:\n  - omnichannel-diary\n---\n\n# ${date.day}\n`;
     const file = await this.writer.append(diaryPath, `${lines.join("\n")}\n`, initial);
-    return { file, diaryPath, clips, attachmentFailures, clipFailures };
+    await this.remember(messageKey);
+    return { file, diaryPath, clips, attachmentFailures, clipFailures, messageKey };
   }
 }
 

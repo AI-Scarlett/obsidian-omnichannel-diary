@@ -159,36 +159,41 @@ class WeChatChannel extends BaseChannel {
         const result = await ilinkJson(this.config.baseUrl || DEFAULT_BASE_URL, "ilink/bot/getupdates", {
           body: { get_updates_buf: this.config.syncBuf || "" }, token: this.config.token, timeoutMs: 50_000, signal,
         });
-        if (result.get_updates_buf !== undefined) {
-          this.config.syncBuf = result.get_updates_buf;
-          await this.context.saveSettings();
-        }
+        await this.processUpdate(result);
         this.setState("connected", "微信 iLink 在线");
         retryMs = 1_000;
-        for (const message of result.msgs || []) {
-          if (message.message_type !== 1) continue;
-          const items = message.item_list || [];
-          const attachments = items.map(itemAttachment).filter(Boolean);
-          await this.deliver({
-            id: String(message.message_id || message.seq || `${message.from_user_id}-${message.create_time_ms}`),
-            timestamp: new Date(Number(message.create_time_ms) || Date.now()),
-            senderId: message.from_user_id || "wechat-user",
-            senderName: message.from_user_id || "微信用户",
-            chatName: message.session_id || "微信私聊",
-            text: items.map(itemText).filter(Boolean).join("\n"),
-            attachments,
-            reply: async (text) => ilinkJson(this.config.baseUrl || DEFAULT_BASE_URL, "ilink/bot/sendmessage", {
-              token: this.config.token,
-              body: { msg: { to_user_id: message.from_user_id, context_token: message.context_token, item_list: [{ type: 1, text_item: { text } }] } },
-            }),
-          });
-        }
       } catch (error) {
         if (signal.aborted) break;
         this.setState("error", `微信连接重试中：${error?.message || error}`);
         await new Promise((resolve) => setTimeout(resolve, retryMs));
         retryMs = Math.min(30_000, retryMs * 2);
       }
+    }
+  }
+
+  async processUpdate(result) {
+    for (const message of result.msgs || []) {
+      if (message.message_type !== 1) continue;
+      const items = message.item_list || [];
+      const attachments = items.map(itemAttachment).filter(Boolean);
+      const delivery = await this.deliver({
+        id: String(message.message_id || message.seq || `${message.from_user_id}-${message.create_time_ms}`),
+        timestamp: new Date(Number(message.create_time_ms) || Date.now()),
+        senderId: message.from_user_id || "wechat-user",
+        senderName: message.from_user_id || "微信用户",
+        chatName: message.session_id || "微信私聊",
+        text: items.map(itemText).filter(Boolean).join("\n"),
+        attachments,
+        reply: async (text) => ilinkJson(this.config.baseUrl || DEFAULT_BASE_URL, "ilink/bot/sendmessage", {
+          token: this.config.token,
+          body: { msg: { to_user_id: message.from_user_id, context_token: message.context_token, item_list: [{ type: 1, text_item: { text } }] } },
+        }),
+      });
+      if (delivery?.ok === false) throw delivery.error;
+    }
+    if (result.get_updates_buf !== undefined) {
+      this.config.syncBuf = result.get_updates_buf;
+      await this.context.saveSettings();
     }
   }
 

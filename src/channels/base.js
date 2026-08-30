@@ -22,15 +22,17 @@ class BaseChannel {
 
   async deliver(envelope) {
     try {
-      await this.context.onMessage({
+      const result = await this.context.onMessage({
         channel: this.id,
         channelName: CHANNEL_META[this.id].name,
         timestamp: new Date(),
         attachments: [],
         ...envelope,
       });
+      return { ok: true, result };
     } catch (error) {
-      this.setState("error", `保存失败：${toErrorMessage(error)}`);
+      this.setState("error", `消息处理失败：${toErrorMessage(error)}`);
+      return { ok: false, error };
     }
   }
 

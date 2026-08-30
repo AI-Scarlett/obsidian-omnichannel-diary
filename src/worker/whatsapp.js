@@ -134,7 +134,10 @@ async function runWhatsAppWorker(options = {}) {
   const onMessage = async (message) => {
     if (message?.type === "reply" && socket && message.jid) {
       try { await socket.sendMessage(message.jid, { text: String(message.text || "") }); }
-      catch (error) { emit({ type: "status", state: "error", detail: `WhatsApp 回复失败：${error?.message || error}` }); }
+      catch (error) {
+        emit({ type: "status", state: "error", detail: `WhatsApp 回复失败：${error?.message || error}` });
+        throw error;
+      }
     }
     if (message?.type === "stop") {
       stopped = true;
