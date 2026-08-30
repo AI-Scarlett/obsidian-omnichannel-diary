@@ -121,7 +121,17 @@ class DiaryService {
     const initial = `---\ndate: ${date.day}\ntags:\n  - omnichannel-diary\n---\n\n# ${date.day}\n`;
     const file = await this.writer.append(diaryPath, `${lines.join("\n")}\n`, initial);
     await this.remember(messageKey);
-    return { file, diaryPath, clips, attachmentFailures, clipFailures, messageKey };
+    return {
+      file,
+      diaryPath,
+      diaryFolder: settings.storage.diaryFolder,
+      clippingFolder: settings.storage.clippingFolder,
+      clips,
+      savedAttachments: attachmentLines.length,
+      attachmentFailures,
+      clipFailures,
+      messageKey,
+    };
   }
 }
 

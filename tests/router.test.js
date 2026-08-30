@@ -3,6 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { CaptureRouter, HELP_TEXT, formatCaptureReceipt } = require("../src/core/router");
+const { CHANNEL_IDS } = require("../src/core/settings");
 
 test("help and status are deterministic and never invoke capture", async () => {
   let captures = 0;
@@ -22,13 +23,20 @@ test("clip command passes only the URL to diary capture", async () => {
   assert.equal(captured.text, "https://example.com/post");
 });
 
-test("capture receipts are identical across WeChat and WhatsApp", async () => {
+test("capture receipts use the same friendly format across all nine channels", async () => {
   const replies = [];
   const diary = {
     capture: async (envelope) => ({
       diaryPath: "日记/2026-08-30.md",
+      diaryFolder: "日记",
+      clippingFolder: "全渠道剪藏",
       messageKey: `${envelope.channel}:1`,
-      clips: [{ article: { extractionStatus: "complete" }, imageFailures: [] }],
+      clips: [{
+        notePath: "全渠道剪藏/article.md",
+        article: { title: "月入30万美元，这位英国老兵把最“土”的网站做到了月访问791万", extractionStatus: "complete" },
+        savedImages: 7,
+        imageFailures: [],
+      }],
       clipFailures: [],
       attachmentFailures: [],
     }),
@@ -36,11 +44,17 @@ test("capture receipts are identical across WeChat and WhatsApp", async () => {
     completeReceipt: async () => {},
   };
   const router = new CaptureRouter(diary, () => ({}), { replyRetryDelays: [0] });
-  for (const channel of ["wechat", "whatsapp"]) {
+  for (const channel of CHANNEL_IDS) {
     await router.handle({ channel, text: "https://example.com", reply: async (text) => replies.push(text) });
   }
-  assert.equal(replies[0], replies[1]);
-  assert.equal(replies[0], "✅ 已保存\n日记：日记/2026-08-30.md\n网页剪藏：1 篇，正文已提取");
+  assert.equal(new Set(replies).size, 1);
+  assert.equal(replies.length, 9);
+  assert.equal(replies[0], [
+    "🔖 《月入30万美元，这位英国老兵把最“土”的网站做到了月访问791万》已提取正文和 7 张图片并保存到「全渠道剪藏」",
+    "",
+    "嗨~ 我是你的随手记 Agent ✍️",
+    "想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取正文存成一篇 Markdown 剪藏，并在今天的笔记里留入口。记的东西在 Obsidian 的「日记」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。",
+  ].join("\n"));
 });
 
 test("reply retries and clears the durable receipt only after delivery", async () => {
@@ -74,11 +88,12 @@ test("a replayed duplicate sends its pending receipt without saving twice", asyn
 test("partial extraction produces a warning instead of a false success", () => {
   const text = formatCaptureReceipt({
     diaryPath: "日记/today.md",
-    clips: [{ article: { extractionStatus: "partial" }, imageFailures: ["image"] }],
+    clips: [{ article: { title: "测试网页", extractionStatus: "partial" }, savedImages: 2, imageFailures: ["image"] }],
     clipFailures: [],
     attachmentFailures: [],
   });
-  assert.match(text, /^⚠️ 已部分保存/);
-  assert.match(text, /正文不完整/);
-  assert.match(text, /图片失败：1 张/);
+  assert.match(text, /^⚠️ 《测试网页》正文提取不完整/);
+  assert.match(text, /2 张图片/);
+  assert.match(text, /另有 1 张图片保存失败/);
+  assert.match(text, /随手记 Agent/);
 });
