@@ -5,7 +5,7 @@ const http = require("node:http");
 const https = require("node:https");
 const { assertSafeRemoteUrl, isPrivateHost, mimeExtension, safeFileName } = require("./util");
 
-const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/132 Safari/537.36 OmnichannelDiary/0.3";
+const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/132 Safari/537.36 OmnichannelDiary/0.4";
 
 function isPrivateAddress(address) {
   return isPrivateHost(address);

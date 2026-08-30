@@ -69,7 +69,7 @@ test("capture receipts use the same friendly format across all nine channels", a
     "🔖 《月入30万美元，这位英国老兵把最“土”的网站做到了月访问791万》已提取正文和 7 张图片并保存到「全渠道剪藏」",
     "",
     "嗨~ 我是你的随手记 Agent ✍️",
-    "想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取正文存成一篇 Markdown 剪藏，并在今天的笔记里留入口。记的东西在 Obsidian 的「日记」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。",
+    "想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取支持的文章、云文档、PDF，以及国内外技术社区的帖子、问答和评论串，存成 Markdown 剪藏，并在今天的笔记里留入口。记的东西在 Obsidian 的「日记」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。",
   ].join("\n"));
 });
 
@@ -143,4 +143,22 @@ test("partial extraction produces a warning instead of a false success", () => {
   assert.match(text, /2 张图片/);
   assert.match(text, /另有 1 张图片保存失败/);
   assert.match(text, /随手记 Agent/);
+});
+
+test("community receipts report captured comment threads in both languages", () => {
+  const clip = { article: { title: "技术讨论", extractionStatus: "complete", commentCount: 26 }, savedImages: 3, imageFailures: [] };
+  assert.match(formatCaptureReceipt({ diaryPath: "日记/today.md", clips: [clip] }), /正文、26 条评论和 3 张图片/);
+  assert.match(formatCaptureReceipt({ diaryPath: "Daily/today.md", clips: [clip] }, "en"), /full text, 26 comments, and 3 images/);
+});
+
+test("PDF receipts distinguish a saved original from an original-file failure", () => {
+  const saved = formatCaptureReceipt({
+    diaryPath: "日记/today.md", clips: [{ article: { title: "在线报告", extractionStatus: "complete" }, savedImages: 0, savedFiles: 1, imageFailures: [], fileFailures: [] }],
+  });
+  assert.match(saved, /并保留 1 个原文件/);
+  const failed = formatCaptureReceipt({
+    diaryPath: "日记/today.md", clips: [{ article: { title: "在线报告", extractionStatus: "complete" }, savedImages: 0, savedFiles: 0, imageFailures: [], fileFailures: ["pdf"] }],
+  });
+  assert.match(failed, /^⚠️/);
+  assert.match(failed, /1 个原文件保存失败/);
 });

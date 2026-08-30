@@ -50,6 +50,8 @@ const DEFAULT_SETTINGS = {
   capture: {
     autoClipLinks: true,
     downloadWebImages: true,
+    renderDynamicPages: true,
+    browserExecutable: "",
     downloadChatAttachments: true,
     maxFileMb: 20,
     includeGroupMessages: true,
@@ -91,6 +93,7 @@ function normalizeSettings(saved) {
   value.storage.clippingFolder = sanitizeFolder(value.storage.clippingFolder, DEFAULT_SETTINGS.storage.clippingFolder);
   value.storage.attachmentFolder = sanitizeFolder(value.storage.attachmentFolder, DEFAULT_SETTINGS.storage.attachmentFolder);
   value.capture.maxFileMb = Math.min(100, Math.max(1, Number(value.capture.maxFileMb) || 20));
+  value.capture.browserExecutable = String(value.capture.browserExecutable || "").trim();
   value.ui.language = normalizeLanguagePreference(value.ui.language);
   value.runtime.recentMessageIds = Array.isArray(value.runtime.recentMessageIds) ? value.runtime.recentMessageIds.slice(-500) : [];
   value.runtime.pendingReceipts = Array.isArray(value.runtime.pendingReceipts)
@@ -120,6 +123,8 @@ function migrateLegacySettings(saved) {
     capture: {
       autoClipLinks: legacySettings.webClipEnabled !== false,
       downloadWebImages: legacySettings.webClipSaveImages !== false,
+      renderDynamicPages: true,
+      browserExecutable: "",
       downloadChatAttachments: legacySettings.saveVoiceAudio !== false,
       maxFileMb: Number(legacySettings.webClipMaxTotalImageMb) || DEFAULT_SETTINGS.capture.maxFileMb,
       includeGroupMessages: true,

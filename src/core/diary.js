@@ -5,10 +5,11 @@ const { WebClipper } = require("./webclip");
 const { extractUrls, localDateParts, markdownEscape, safeFileName, shortHash } = require("./util");
 
 class DiaryService {
-  constructor(writer, getSettings, onSettingsChanged) {
+  constructor(writer, getSettings, onSettingsChanged, options = {}) {
     this.writer = writer;
     this.getSettings = getSettings;
     this.onSettingsChanged = onSettingsChanged;
+    this.sessionManager = options.sessionManager;
   }
 
   messageKey(envelope) {
@@ -98,7 +99,7 @@ class DiaryService {
     const clips = [];
     const clipFailures = [];
     if (settings.capture.autoClipLinks) {
-      const clipper = new WebClipper(this.writer, settings);
+      const clipper = new WebClipper(this.writer, settings, { sessionManager: this.sessionManager });
       for (const url of extractUrls(envelope.text).slice(0, 5)) {
         try {
           clips.push(await clipper.save(url, { channel: envelope.channel, timestamp: envelope.timestamp }));

@@ -24,6 +24,8 @@ test("saved values are merged, folders normalized, and unknown inherited keys dr
   assert.equal(settings.inheritedLegacyKey, undefined);
   assert.deepEqual(settings.runtime.pendingReceipts, []);
   assert.equal(settings.ui.language, "auto");
+  assert.equal(settings.capture.renderDynamicPages, true);
+  assert.equal(settings.capture.browserExecutable, "");
 });
 
 test("language choice is preserved and invalid values fall back to Obsidian auto detection", () => {

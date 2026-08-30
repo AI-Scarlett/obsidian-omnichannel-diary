@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { parseHTML } = require("linkedom");
-const { bestSrcset, cleanMarkdown, isLikelyContentImage, nodeToMarkdown, prepareDocument, selectArticle } = require("../src/core/webclip");
+const { articleFromHtml, bestSrcset, cleanMarkdown, detectCommunityPage, isLikelyContentImage, nodeToMarkdown, prepareDocument, selectArticle } = require("../src/core/webclip");
 
 test("lazy images and relative links become absolute before extraction", () => {
   const { document } = parseHTML('<!doctype html><html><body><a href="/next">next</a><img data-src="/photo.jpg"><script>bad()</script></body></html>');
@@ -43,4 +43,13 @@ test("WeChat articles use js_content instead of script-heavy Readability input",
   assert.equal(article.siteName, "测试公众号");
   assert.match(article.content, /这是微信公众号正文/);
   assert.match(article.content, /https:\/\/mp\.weixin\.qq\.com\/article\.jpg/);
+});
+
+test("unknown forum engines and generic comment markup receive a conversation fallback", () => {
+  const html = `<!doctype html><html><head><meta name="generator" content="Flarum"></head><body><main><article><h1>Extensible forum</h1><p>${"Main technical discussion. ".repeat(12)}</p></article><div class="comment"><strong>Alice</strong><p>First useful reply with enough detail.</p></div><div class="comment"><strong>Bob</strong><p>Second useful reply with another perspective.</p></div></main></body></html>`;
+  assert.equal(detectCommunityPage(html, "https://forum.example.org/d/123"), true);
+  const article = articleFromHtml(html, "https://forum.example.org/d/123");
+  assert.equal(article.commentCount, 2);
+  assert.match(article.extractionMethod, /with-comments/);
+  assert.match(article.markdown, /First useful reply/);
 });

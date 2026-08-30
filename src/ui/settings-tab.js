@@ -3,6 +3,7 @@
 const QRCode = require("qrcode");
 const { Modal, Notice, PluginSettingTab, Setting, setIcon } = require("obsidian");
 const { CHANNEL_IDS, clearChannelCredentials, getChannelMeta } = require("../core/settings");
+const { COMMUNITY_SERVICES, DOCUMENT_SERVICES, communityCoverage } = require("../core/web-platforms");
 const { shortHash } = require("../core/util");
 
 const SECTIONS = [
@@ -154,8 +155,8 @@ class ManualCaptureModal extends Modal {
     this.titleEl.setText(this.plugin.t("保存到 Omnichannel Diary", "Save to Omnichannel Diary"));
     this.contentEl.addClass("od-manual-modal");
     this.contentEl.createEl("p", { text: this.plugin.t(
-      "粘贴文字或网页链接。链接会按当前收集规则提取正文与图片。",
-      "Paste text or a web link. Links are processed using your current article and image capture rules.",
+      "粘贴文字或网页链接。链接会按当前规则提取文章、云文档、PDF，以及技术社区的帖子、问答、评论与图片。",
+      "Paste text or a web link. Links use the current rules for articles, cloud documents, PDFs, and technical-community posts, answers, comments, and images.",
     ) });
     const textarea = this.contentEl.createEl("textarea", { cls: "od-manual-input" });
     textarea.setAttr("rows", "7");
@@ -237,8 +238,8 @@ class DiarySettingTab extends PluginSettingTab {
     copy.createDiv({ cls: "od-eyebrow", text: "LOCAL-FIRST CAPTURE" });
     copy.createEl("h1", { text: "Omnichannel Diary" });
     copy.createEl("p", { text: this.tr(
-      "把聊天里的灵感、网页正文和附件，可靠地沉淀到当前 Obsidian Vault。没有 AI 路由，也不会把笔记上传到中间服务。",
-      "Capture ideas, web articles, and attachments from chat into this Obsidian Vault. No AI routing and no intermediary note-upload service.",
+      "把聊天里的灵感、网页、云文档、PDF、技术社区讨论和附件，可靠地沉淀到当前 Obsidian Vault。没有 AI 路由，也不会把笔记上传到中间服务。",
+      "Capture ideas, web pages, cloud documents, PDFs, technical-community discussions, and attachments into this Obsidian Vault. No AI routing and no intermediary note-upload service.",
     ) });
     const actions = hero.createDiv({ cls: "od-hero-actions" });
     iconButton(actions, this.tr("手动保存", "Manual capture"), "square-pen", () => new ManualCaptureModal(this.app, this.plugin).open(), "is-primary");
@@ -302,11 +303,11 @@ class DiarySettingTab extends PluginSettingTab {
     const list = steps.createDiv({ cls: "od-step-list" });
     for (const [number, title, text] of (this.locale() === "en" ? [
       ["01", "Choose a channel", "Authorize with a QR code or enter the bot credentials issued by the platform."],
-      ["02", "Send content", "Text goes to the daily note, links create article clippings, and attachments are stored locally."],
+      ["02", "Send content", "Text goes to the daily note; supported pages, documents, PDFs, technical posts, answers, and comments become clippings; attachments stay local."],
       ["03", "Return to Obsidian", "Each day has one note with clear sources, failures, and local attachments."],
     ] : [
       ["01", "选择渠道", "扫码授权，或填入平台签发的 Bot 凭据。"],
-      ["02", "发送内容", "文字写入日记；链接额外生成正文剪藏；附件保存到本地目录。"],
+      ["02", "发送内容", "文字写入日记；支持的网页、云文档、PDF、技术帖子、问答与评论生成剪藏；附件保存在本地。"],
       ["03", "回到 Obsidian", "每天一篇日记，来源、失败项和本地附件都有明确记录。"],
     ])) {
       const step = list.createDiv({ cls: "od-step" });
@@ -441,6 +442,10 @@ class DiarySettingTab extends PluginSettingTab {
     rules.createEl("h3", { text: this.tr("收集规则", "Capture rules") });
     this.addToggle(rules, this.tr("自动剪藏网页", "Automatically clip web pages"), this.tr("检测消息中的 HTTP(S) 链接并保存可读正文", "Detect HTTP(S) links in messages and save readable article text"), "autoClipLinks");
     this.addToggle(rules, this.tr("保存网页图片", "Save web images"), this.tr("把正文图片下载到 Vault；失败时保留远程地址并写明数量", "Download article images into the Vault; keep remote URLs and report failures"), "downloadWebImages");
+    this.addToggle(rules, this.tr("渲染动态网页与云文档", "Render dynamic pages and cloud documents"), this.tr(
+      "用独立本地浏览器提取云文档及国内外技术社区的正文、问答和评论",
+      "Use an isolated local browser for cloud documents and posts, answers, and comments from technical communities worldwide",
+    ), "renderDynamicPages");
     this.addToggle(rules, this.tr("保存聊天附件", "Save chat attachments"), this.tr("图片、文件、音频和视频按渠道保存", "Store images, files, audio, and video by channel"), "downloadChatAttachments");
     this.addToggle(rules, this.tr("收集群聊消息", "Capture group messages"), this.tr("关闭后只保存私聊", "When disabled, only direct messages are saved"), "includeGroupMessages");
     this.addToggle(rules, this.tr("群聊必须提及机器人", "Require a bot mention in groups"), this.tr("减少群聊噪声；需要平台提供 mention 信息", "Reduces group noise; requires mention metadata from the platform"), "requireMentionInGroups");
@@ -450,6 +455,76 @@ class DiarySettingTab extends PluginSettingTab {
         this.plugin.settings.capture.maxFileMb = Math.min(100, Math.max(1, Number(value) || 20)); await this.plugin.saveSettings();
       });
     });
+    const coverage = parent.createDiv({ cls: "od-panel" });
+    coverage.createEl("h3", { text: this.tr("技术社区覆盖", "Technical-community coverage") });
+    coverage.createEl("p", { text: this.tr(
+      "公开接口优先，动态页面使用隔离浏览器，未列出的普通文章仍会尝试通用正文提取。站点改版或登录墙可能导致部分评论暂时不可见。",
+      "Public APIs are preferred, dynamic pages use an isolated browser, and unlisted articles still use generic readable-content extraction. Site redesigns or sign-in walls can temporarily hide some comments.",
+    ) });
+    const coverageGrid = coverage.createDiv({ cls: "od-support-grid" });
+    for (const [region, titleZh, titleEn] of [["international", "国外社区", "International"], ["china", "国内社区", "China"]]) {
+      const group = coverageGrid.createDiv({ cls: "od-support-group" });
+      group.createEl("h4", { text: this.tr(titleZh, titleEn) });
+      const tags = group.createDiv({ cls: "od-support-tags" });
+      for (const service of communityCoverage(region)) {
+        const tag = tags.createSpan({ cls: `od-support-tag ${service.api === "rendered" ? "" : "is-api"}`.trim(), text: service.name });
+        tag.setAttr("title", service.api === "rendered" ? this.tr("隔离浏览器 + 通用兜底", "Isolated browser + generic fallback") : this.tr("结构化公开接口 + 浏览器兜底", "Structured public API + browser fallback"));
+      }
+    }
+    const sessions = parent.createDiv({ cls: "od-panel" });
+    sessions.createEl("h3", { text: this.tr("私有云文档登录", "Private cloud-document sessions") });
+    sessions.createEl("p", { text: this.tr(
+      "公开文档无需登录。私有文档请在下面打开插件专用浏览器完成登录；会话只保存在当前 Vault 的 .channel-data，不读取 Chrome 现有 Cookie。登录完成后直接关闭浏览器窗口。",
+      "Public documents need no login. For private documents, sign in through the isolated browser below. Its session stays in this Vault's .channel-data and never reads existing Chrome cookies. Close the browser window when finished.",
+    ) });
+    for (const [id, service] of Object.entries(DOCUMENT_SERVICES)) {
+      const row = sessions.createDiv({ cls: "od-session-row" });
+      const copy = row.createDiv({ cls: "od-session-copy" });
+      copy.createEl("strong", { text: service.name });
+      copy.createSpan({ text: this.plugin.webSessionManager.hasSessionData(id)
+        ? this.tr("已存在本地会话（仍需由平台确认是否有效）", "Local session data exists (the service still decides whether it remains valid)")
+        : this.tr("尚未建立本地会话", "No local session yet") });
+      iconButton(row, this.tr("打开登录窗口", "Open sign-in window"), "log-in", async () => {
+        try {
+          const result = await this.plugin.webSessionManager.openLogin(id, { browserExecutable: this.plugin.settings.capture.browserExecutable });
+          new Notice(result.alreadyOpen
+            ? this.tr("{name} 登录窗口已打开", "The {name} sign-in window is already open", { name: service.name })
+            : this.tr("请在新窗口完成 {name} 登录，完成后关闭窗口", "Sign in to {name} in the new window, then close it", { name: service.name }), 9000);
+        } catch (error) {
+          new Notice(this.tr("无法打开登录窗口：{error}", "Could not open the sign-in window: {error}", { error: error?.message || error }), 9000);
+        }
+      }, "is-primary");
+    }
+    sessions.createEl("h4", { text: this.tr("技术社区浏览器会话", "Technical-community browser sessions") });
+    sessions.createEl("p", { text: this.tr(
+      "部分社区触发登录或真人验证时，可在对应隔离窗口完成一次验证；插件不会读取你现有浏览器的 Cookie。其他已支持社区默认直接公开提取。",
+      "When a community requires sign-in or human verification, complete it once in its isolated window. The plugin never reads existing browser cookies. Other supported communities use public extraction by default.",
+    ) });
+    for (const [id, service] of Object.entries(COMMUNITY_SERVICES).filter(([, item]) => item.session)) {
+      const row = sessions.createDiv({ cls: "od-session-row" });
+      const copy = row.createDiv({ cls: "od-session-copy" });
+      copy.createEl("strong", { text: service.name });
+      copy.createSpan({ text: this.plugin.webSessionManager.hasSessionData(id)
+        ? this.tr("已存在本地会话（仍需由平台确认是否有效）", "Local session data exists (the service still decides whether it remains valid)")
+        : this.tr("公开提取受限时再建立会话", "Create a session only if public extraction is challenged") });
+      iconButton(row, this.tr("打开验证窗口", "Open verification window"), "shield-check", async () => {
+        try {
+          const result = await this.plugin.webSessionManager.openLogin(id, { browserExecutable: this.plugin.settings.capture.browserExecutable });
+          new Notice(result.alreadyOpen
+            ? this.tr("{name} 窗口已打开", "The {name} window is already open", { name: service.name })
+            : this.tr("请在新窗口完成 {name} 登录或验证，完成后关闭窗口", "Complete {name} sign-in or verification in the new window, then close it", { name: service.name }), 9000);
+        } catch (error) {
+          new Notice(this.tr("无法打开验证窗口：{error}", "Could not open the verification window: {error}", { error: error?.message || error }), 9000);
+        }
+      }, "is-primary");
+    }
+    new Setting(sessions).setName(this.tr("浏览器程序路径（可选）", "Browser executable (optional)")).setDesc(this.tr(
+      "默认自动查找 Chrome、Edge、Brave 或 Chromium；只有未找到时才需要填写完整路径。",
+      "Chrome, Edge, Brave, or Chromium is detected automatically. Enter a full path only when detection fails.",
+    )).addText((input) => input.setPlaceholder(this.locale() === "en" ? "/path/to/chrome" : "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").setValue(this.plugin.settings.capture.browserExecutable).onChange(async (value) => {
+      this.plugin.settings.capture.browserExecutable = value.trim();
+      await this.plugin.saveSettings();
+    }));
   }
 
   addToggle(parent, name, desc, key) {
@@ -467,16 +542,16 @@ class DiarySettingTab extends PluginSettingTab {
     local.createEl("h3", { text: this.tr("本地保存", "Local storage") });
     const points = local.createEl("ul");
     points.createEl("li", { text: this.tr("消息正文、网页正文和下载成功的附件写入当前 Vault。", "Message text, web articles, and successfully downloaded attachments are written to the current Vault.") });
-    points.createEl("li", { text: this.tr("Bot Token、App Secret 和扫码会话凭据保存在插件 data.json 或 .channel-data 目录，未做额外加密。", "Bot tokens, app secrets, and QR session credentials are stored in the plugin's data.json or .channel-data directory without additional encryption.") });
+    points.createEl("li", { text: this.tr("Bot Token、App Secret、扫码凭据与云文档浏览器会话保存在插件 data.json 或 .channel-data 目录，未做额外加密。", "Bot tokens, app secrets, QR credentials, and cloud-document browser sessions are stored in the plugin's data.json or .channel-data directory without additional encryption.") });
     points.createEl("li", { text: this.tr("插件不会扫描与收集目录无关的笔记，也不会自动发布任何内容。", "The plugin does not scan notes outside its capture workflow and never publishes content automatically.") });
     const network = parent.createDiv({ cls: "od-panel od-privacy-panel" });
     network.createEl("h3", { text: this.tr("网络访问", "Network access") });
     network.createEl("p", { text: this.tr(
-      "启用哪个渠道，就会连接该平台的官方 API/CDN；剪藏链接时会访问链接域名及正文图片域名。localhost、局域网和私有 IP 被阻止。",
-      "Enabled channels connect to their official API/CDN. Clipping visits the link host and article-image hosts. localhost, local networks, and private IPs are blocked.",
+      "启用哪个渠道，就会连接该平台的官方 API/CDN；剪藏会访问链接、正文图片及动态页面资源域名。localhost、局域网和私有 IP 被阻止。",
+      "Enabled channels connect to their official API/CDN. Clipping visits link, article-image, and dynamic-page resource hosts. localhost, local networks, and private IPs are blocked.",
     ) });
     const chips = network.createDiv({ cls: "od-domain-chips" });
-    for (const domain of ["weixin.qq.com", "feishu.cn / larksuite.com", "dingtalk.com", "work.weixin.qq.com", "qq.com", "slack.com", "telegram.org", "discord.com", "whatsapp.net"]) {
+    for (const domain of ["weixin.qq.com", "feishu.cn / larksuite.com", "docs.qq.com", "kdocs.cn / wps.cn", "reddit.com", "producthunt.com", "dingtalk.com", "work.weixin.qq.com", "qq.com", "slack.com", "telegram.org", "discord.com", "whatsapp.net"]) {
       chips.createEl("code", { text: domain });
     }
     const credentials = parent.createDiv({ cls: "od-panel" });

@@ -9,6 +9,7 @@ The plugin writes:
 - downloaded chat attachments and page images;
 - plugin settings and channel credentials in `data.json`;
 - WhatsApp linked-device state under `.channel-data/whatsapp-auth`.
+- isolated Chromium-compatible profiles for cloud-document and registered community adapters under `.channel-data/document-sessions`. The profile for a sign-in or verification flow is created only when the user opens that flow; headless public extraction profiles contain only browsing state created by this plugin.
 
 Credential fields are not additionally encrypted. Anyone with access to the Vault's plugin directory may be able to read them.
 
@@ -25,9 +26,11 @@ Network access is initiated only for enabled features:
 - Telegram: `api.telegram.org`;
 - Discord: `discord.com` API and Discord Gateway/CDN;
 - WhatsApp: endpoints selected by the bundled linked-device transport;
-- Web clipping: the supplied page URL, redirect targets, and image URLs found in its readable content.
+- Web clipping: the supplied page URL, redirect targets, image/resource URLs found in its readable content, direct PDF files, public endpoints used for Reddit, Hacker News, GitHub, Stack Exchange, DEV/Forem, Discourse, and V2EX, plus rendered cloud-document and registered community pages.
 
-The web clipper validates every HTTP(S) redirect and DNS result. It rejects localhost, link-local ranges, private IPv4 ranges, private IPv6 ranges, and non-HTTP protocols.
+The direct web clipper validates every HTTP(S) redirect and DNS result. The dynamic renderer intercepts browser requests and applies the same public-host validation before continuing them. Both reject localhost, link-local ranges, private IPv4 ranges, private IPv6 ranges, and non-HTTP protocols.
+
+The dynamic renderer launches an already installed Chrome, Edge, Brave, or Chromium executable with a Vault-specific user-data directory. It does not read the user's normal browser profile or cookies, download a browser, install a package, upload session data, or enter credentials. Sign-in and human-verification steps happen only in a window the user explicitly opens.
 
 ## Not performed
 

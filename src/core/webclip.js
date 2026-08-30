@@ -2,8 +2,12 @@
 
 const { Readability } = require("@mozilla/readability");
 const { parseHTML } = require("linkedom");
+const { extractCommunityPost } = require("./communityclip");
 const { downloadRemoteFile, readLimitedBody, safeFetch } = require("./network");
 const { localDateParts, safeFileName, shortHash, yamlString } = require("./util");
+const { extractPdf } = require("./pdfclip");
+const { extractRedditPost, parseRedditUrl } = require("./redditclip");
+const { COMMUNITY_SERVICES, communityServiceForUrl, documentServiceForUrl, isLikelyPdfUrl, renderServiceForUrl } = require("./web-platforms");
 const { extractXStatus } = require("./xclip");
 
 function absoluteUrl(value, baseUrl) {
@@ -83,6 +87,29 @@ function metaContent(document, selector) {
   return String(document.querySelector(selector)?.getAttribute("content") || "").trim();
 }
 
+const GENERIC_COMMENT_SELECTORS = [
+  "[itemprop='comment']", "[data-testid*='comment' i]", ".topic-post", ".comment-item", ".feedbackItem", ".CommentItem", ".comment", ".reply", ".answer",
+];
+
+function genericCommentNodes(document) {
+  for (const selector of GENERIC_COMMENT_SELECTORS) {
+    let nodes = [];
+    try { nodes = [...document.querySelectorAll(selector)].filter((node) => normalizedText(node).length >= 12); } catch (_) {}
+    if (nodes.length) return nodes.slice(0, 300);
+  }
+  return [];
+}
+
+function detectCommunityPage(html, finalUrl) {
+  const { document } = parseHTML(html);
+  const generator = metaContent(document, 'meta[name="generator"]').toLowerCase();
+  if (/discourse|forem|question2answer|flarum|nodebb|vanilla forums|xenforo/.test(generator)) return true;
+  let pathname = "";
+  try { pathname = new URL(finalUrl).pathname; } catch (_) {}
+  if (/\/(?:t|topic|discussion|questions?)\/[^/]*\d+/i.test(pathname)) return true;
+  return genericCommentNodes(document).length > 0;
+}
+
 function selectArticle(document, finalUrl) {
   const hostname = new URL(finalUrl).hostname.toLowerCase();
   const wechatContent = hostname === "mp.weixin.qq.com" ? document.querySelector("#js_content") : null;
@@ -115,44 +142,141 @@ function selectArticle(document, finalUrl) {
   };
 }
 
+function articleFromHtml(html, finalUrl, overrides = {}) {
+  const { document } = parseHTML(html);
+  prepareDocument(document, finalUrl);
+  const article = overrides.content !== undefined ? overrides : { ...selectArticle(document, finalUrl), ...overrides };
+  let sourceHtml = article.content !== undefined ? article.content : document.body?.innerHTML || "";
+  let commentCount = Number(article.commentCount) || 0;
+  if (overrides.content === undefined) {
+    const articleText = normalizedText(parseHTML(`<body>${sourceHtml}</body>`).document.body);
+    const comments = genericCommentNodes(document).filter((node) => {
+      const sample = normalizedText(node).slice(0, 100);
+      return sample && !articleText.includes(sample);
+    });
+    if (comments.length) {
+      sourceHtml += `<section class="community-comments"><h2>Comments (${comments.length})</h2>${comments.map((node, index) => `<article><h3>Comment ${index + 1}</h3>${node.outerHTML}</article>`).join("")}</section>`;
+      commentCount = comments.length;
+      article.extractionMethod = `${article.extractionMethod || "readability"}-with-comments`;
+    }
+  }
+  const { document: articleDocument } = parseHTML(`<!doctype html><html><head></head><body>${sourceHtml}</body></html>`);
+  prepareDocument(articleDocument, finalUrl);
+  for (const image of articleDocument.querySelectorAll("img[src]")) {
+    if (!isLikelyContentImage(image)) image.remove();
+  }
+  const images = [...articleDocument.querySelectorAll("img[src]")]
+    .map((image) => image.getAttribute("src"))
+    .filter((value) => /^(?:https?:|data:)/i.test(value || ""));
+  const converted = cleanMarkdown(nodeToMarkdown(articleDocument.body));
+  const fallbackText = cleanMarkdown(overrides.plainText || "");
+  const markdown = converted.length >= Math.min(120, fallbackText.length) ? converted : fallbackText;
+  const contentChars = (fallbackText || normalizedText(articleDocument.body)).length;
+  const hostname = new URL(finalUrl).hostname;
+  return {
+    url: finalUrl,
+    title: article.title || document.title || hostname,
+    byline: article.byline || "",
+    excerpt: article.excerpt || fallbackText.slice(0, 240),
+    siteName: article.siteName || hostname,
+    markdown,
+    images: [...new Set(images)],
+    contentChars,
+    extractionMethod: article.extractionMethod || "rendered-page",
+    extractionStatus: contentChars >= 120 ? "complete" : "partial",
+    commentCount,
+  };
+}
+
 class WebClipper {
-  constructor(writer, settings) {
+  constructor(writer, settings, options = {}) {
     this.writer = writer;
     this.settings = settings;
+    this.sessionManager = options.sessionManager;
   }
 
   async extract(url) {
     const xStatus = await extractXStatus(url);
     if (xStatus) return xStatus;
-    const { response, finalUrl } = await safeFetch(url, { accept: "text/html,application/xhtml+xml", timeoutMs: 30_000 });
+    let communityError;
+    if (parseRedditUrl(url)) {
+      try {
+        const reddit = await extractRedditPost(url);
+        if (reddit) return reddit;
+      } catch (error) { communityError = error; }
+    } else {
+      try {
+        const data = await extractCommunityPost(url);
+        if (data) {
+          const article = articleFromHtml(data.contentHtml, data.url || url, {
+            title: data.title,
+            byline: data.byline,
+            excerpt: data.excerpt,
+            siteName: data.siteName,
+            content: data.contentHtml,
+            extractionMethod: data.extractionMethod,
+          });
+          return { ...article, commentCount: data.commentCount || 0, extractionStatus: data.extractionStatus || article.extractionStatus };
+        }
+      } catch (error) { communityError = error; }
+    }
+    const renderService = this.settings.capture.renderDynamicPages !== false ? renderServiceForUrl(url) : null;
+    let renderError;
+    if (renderService && this.sessionManager) {
+      try {
+        const rendered = await this.sessionManager.extract(url, renderService, {
+          browserExecutable: this.settings.capture.browserExecutable,
+        });
+        const article = articleFromHtml(rendered.html, rendered.url, {
+          title: rendered.title,
+          byline: rendered.author,
+          excerpt: rendered.description,
+          siteName: COMMUNITY_SERVICES[renderService]?.name || new URL(rendered.url).hostname,
+          content: rendered.html,
+          plainText: rendered.text,
+          extractionMethod: documentServiceForUrl(rendered.url) ? `${renderService}-rendered-document` : `${renderService}-rendered-community-comments`,
+        });
+        if (article.extractionStatus === "complete") return { ...article, commentCount: Number(rendered.commentCount) || 0 };
+        renderError = new Error(`${COMMUNITY_SERVICES[renderService]?.name || renderService} rendered content was too short to save safely`);
+      } catch (error) {
+        if (error?.code === "DOCUMENT_LOGIN_REQUIRED") throw error;
+        renderError = error;
+      }
+    }
+    if (parseRedditUrl(url) && communityError) throw renderError || communityError;
+    const { response, finalUrl } = await safeFetch(url, { accept: "text/html,application/xhtml+xml,application/pdf", timeoutMs: 30_000 });
     if (!response.ok) throw new Error(`Page returned HTTP ${response.status}`);
     const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/pdf") || (isLikelyPdfUrl(finalUrl) && !contentType.includes("html"))) {
+      const buffer = await readLimitedBody(response, this.settings.capture.maxFileMb * 1024 * 1024);
+      return extractPdf(buffer, finalUrl, response.headers.get("content-disposition") || "");
+    }
     if (!contentType.includes("html") && !contentType.includes("xml")) throw new Error(`Unsupported page type: ${contentType || "unknown"}`);
     const html = (await readLimitedBody(response, 5 * 1024 * 1024)).toString("utf8");
-    const { document } = parseHTML(html);
-    prepareDocument(document, finalUrl);
-    const article = selectArticle(document, finalUrl);
-    const sourceHtml = article.content;
-    const { document: articleDocument } = parseHTML(`<!doctype html><html><head></head><body>${sourceHtml}</body></html>`);
-    prepareDocument(articleDocument, finalUrl);
-    for (const image of articleDocument.querySelectorAll("img[src]")) {
-      if (!isLikelyContentImage(image)) image.remove();
+    if (!renderService && this.settings.capture.renderDynamicPages !== false && this.sessionManager && detectCommunityPage(html, finalUrl)) {
+      try {
+        const rendered = await this.sessionManager.extract(finalUrl, "community-generic", {
+          browserExecutable: this.settings.capture.browserExecutable,
+        });
+        const renderedArticle = articleFromHtml(rendered.html, rendered.url, {
+          title: rendered.title,
+          byline: rendered.author,
+          excerpt: rendered.description,
+          siteName: new URL(rendered.url).hostname,
+          content: rendered.html,
+          plainText: rendered.text,
+          extractionMethod: "generic-rendered-community-comments",
+        });
+        if (renderedArticle.extractionStatus === "complete") return { ...renderedArticle, commentCount: Number(rendered.commentCount) || 0 };
+      } catch (error) {
+        renderError = renderError || error;
+      }
     }
-    const images = [...articleDocument.querySelectorAll("img[src]")].map((image) => image.getAttribute("src")).filter(Boolean);
-    const markdown = cleanMarkdown(nodeToMarkdown(articleDocument.body));
-    const contentChars = normalizedText(articleDocument.body).length;
-    return {
-      url: finalUrl,
-      title: article.title,
-      byline: article.byline,
-      excerpt: article.excerpt,
-      siteName: article.siteName,
-      markdown,
-      images: [...new Set(images)],
-      contentChars,
-      extractionMethod: article.extractionMethod,
-      extractionStatus: contentChars >= 120 ? "complete" : "partial",
-    };
+    const article = articleFromHtml(html, finalUrl);
+    if ((renderError || communityError) && article.extractionStatus === "partial") {
+      article.renderWarning = renderError?.message || communityError?.message || String(renderError || communityError);
+    }
+    return article;
   }
 
   async save(url, source = {}) {
@@ -162,9 +286,20 @@ class WebClipper {
     const notePath = `${this.settings.storage.clippingFolder}/${date.day}-${stem}-${shortHash(article.url)}.md`;
     let markdown = article.markdown || article.excerpt || article.url;
     const failures = [];
+    const fileFailures = [];
     let savedImages = 0;
+    let savedFiles = 0;
+    const assetFolder = `${this.settings.storage.attachmentFolder}/Web/${date.day}/${stem}-${shortHash(article.url)}`;
+    for (const [index, file] of (article.binaryFiles || []).entries()) {
+      try {
+        const localPath = await this.writer.saveBinary(assetFolder, file.fileName || `source-${index + 1}`, file.buffer, file.mimeType);
+        markdown = `[${file.label || file.fileName || "Source file"}](${encodeURI(localPath)})\n\n${markdown}`;
+        savedFiles += 1;
+      } catch (error) {
+        fileFailures.push(`${file.fileName || `source-${index + 1}`}: ${error?.message || error}`);
+      }
+    }
     if (this.settings.capture.downloadWebImages) {
-      const assetFolder = `${this.settings.storage.attachmentFolder}/Web/${date.day}/${stem}-${shortHash(article.url)}`;
       for (const [index, imageUrl] of article.images.slice(0, 60).entries()) {
         try {
           const downloaded = await downloadRemoteFile(imageUrl, {
@@ -189,15 +324,19 @@ class WebClipper {
       `author: ${yamlString(article.byline)}`,
       `clipped_at: ${yamlString(date.iso)}`,
       `channel: ${yamlString(source.channel || "manual")}`,
+      `extraction_method: ${yamlString(article.extractionMethod || "unknown")}`,
       "---",
       "",
     ].join("\n");
-    const report = failures.length ? `\n\n> [!warning] ${failures.length} 张图片未能本地保存，正文中保留远程地址。` : "";
+    const warningParts = [];
+    if (failures.length) warningParts.push(`${failures.length} 张图片未能本地保存，正文中保留远程地址`);
+    if (fileFailures.length) warningParts.push(`${fileFailures.length} 个原文件未能本地保存`);
+    const report = warningParts.length ? `\n\n> [!warning] ${warningParts.join("；")}。` : "";
     const content = `${frontmatter}# ${article.title}\n\n${markdown}${report}\n`;
     if (typeof this.writer.upsertText === "function") await this.writer.upsertText(notePath, content);
     else await this.writer.createText(notePath, content);
-    return { notePath, article, savedImages, imageFailures: failures };
+    return { notePath, article, savedImages, savedFiles, imageFailures: failures, fileFailures };
   }
 }
 
-module.exports = { WebClipper, absoluteUrl, bestSrcset, cleanMarkdown, isLikelyContentImage, nodeToMarkdown, normalizedText, prepareDocument, selectArticle };
+module.exports = { WebClipper, absoluteUrl, articleFromHtml, bestSrcset, cleanMarkdown, detectCommunityPage, genericCommentNodes, isLikelyContentImage, nodeToMarkdown, normalizedText, prepareDocument, selectArticle };

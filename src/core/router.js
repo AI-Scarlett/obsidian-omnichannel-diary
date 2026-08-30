@@ -23,10 +23,10 @@ function formatAgentGuide(result = {}, locale = "zh-CN") {
   const diaryFolder = displayFolder(result.diaryFolder || folderFromPath(result.diaryPath, diaryFallback), diaryFallback);
   return locale === "en" ? [
     "Hi! I'm your quick-capture Agent ✍️",
-    `Send me any text, voice note, image, or file and I'll add it to today's note. Send a web link and I'll extract the article into a Markdown clipping with an entry in today's note. Your notes are stored in the “${diaryFolder}” folder. To change it, open Obsidian Settings → Community plugins → Omnichannel Diary → Storage & privacy → Daily notes. If something needs correcting, edit it directly in Obsidian. Send “help” anytime to see all commands.`,
+    `Send me any text, voice note, image, or file and I'll add it to today's note. Send a web link and I'll extract supported articles, cloud documents, PDFs, technical-community posts, answers, and comment threads into a Markdown clipping with an entry in today's note. Your notes are stored in the “${diaryFolder}” folder. To change it, open Obsidian Settings → Community plugins → Omnichannel Diary → Storage & privacy → Daily notes. If something needs correcting, edit it directly in Obsidian. Send “help” anytime to see all commands.`,
   ].join("\n") : [
     "嗨~ 我是你的随手记 Agent ✍️",
-    `想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取正文存成一篇 Markdown 剪藏，并在今天的笔记里留入口。记的东西在 Obsidian 的「${diaryFolder}」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。`,
+    `想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取支持的文章、云文档、PDF，以及国内外技术社区的帖子、问答和评论串，存成 Markdown 剪藏，并在今天的笔记里留入口。记的东西在 Obsidian 的「${diaryFolder}」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。`,
   ].join("\n");
 }
 
@@ -34,13 +34,13 @@ function formatHelpText(locale = "zh-CN", result = {}) {
   const commands = locale === "en" ? [
     "Available commands:",
     "• Send text, a voice note, an image, or a file: add it to today's note",
-    "• Send a web link: extract the article and images into a Markdown clipping",
+    "• Send a web link: extract articles, cloud documents, PDFs, images, technical-community posts, answers, and supported comment threads into a Markdown clipping",
     "• /clip <URL>: clip only the specified page",
     "• /status: show the current channel connection status",
   ] : [
     "可用指令：",
     "• 直接发送文字、语音、图片或文件：写入今天的笔记",
-    "• 直接发送网页链接：提取正文与图片，生成 Markdown 剪藏",
+    "• 直接发送网页链接：提取文章、云文档、PDF、图片，以及技术社区帖子、问答和支持的评论串，生成 Markdown 剪藏",
     "• /clip <链接>：只剪藏指定网页",
     "• /status：查看当前渠道连接状态",
   ];
@@ -64,23 +64,42 @@ function formatCaptureReceipt(result, locale = "zh-CN") {
     const title = displayTitle(clip.article?.title, locale);
     const savedImages = Math.max(0, Number(clip.savedImages) || 0);
     const failedImages = clip.imageFailures?.length || 0;
+    const savedFiles = Math.max(0, Number(clip.savedFiles) || 0);
+    const failedFiles = clip.fileFailures?.length || 0;
+    const commentCount = Math.max(0, Number(clip.article?.commentCount) || 0);
+    const extractedEn = commentCount
+      ? `the full text, ${commentCount} comment${commentCount === 1 ? "" : "s"}, and ${savedImages} image${savedImages === 1 ? "" : "s"}`
+      : `the full text and ${savedImages} image${savedImages === 1 ? "" : "s"}`;
+    const partialEn = commentCount
+      ? `the available text, ${commentCount} comment${commentCount === 1 ? "" : "s"}, and ${savedImages} image${savedImages === 1 ? "" : "s"}`
+      : `the available text and ${savedImages} image${savedImages === 1 ? "" : "s"}`;
+    const extractedZh = commentCount ? `正文、${commentCount} 条评论和 ${savedImages} 张图片` : `正文和 ${savedImages} 张图片`;
+    const partialZh = commentCount ? `正文片段、${commentCount} 条评论和 ${savedImages} 张图片` : `正文片段和 ${savedImages} 张图片`;
+    const savedFileDetail = savedFiles ? (locale === "en" ? ` The original source file was also saved.` : `，并保留 ${savedFiles} 个原文件`) : "";
     if (locale === "en") {
       if (clip.article?.extractionStatus === "partial") {
-        const failedDetail = failedImages ? `; ${failedImages} additional image${failedImages === 1 ? "" : "s"} failed to save` : "";
-        lines.push(`⚠️ “${title}” was only partially extracted. The available text and ${savedImages} image${savedImages === 1 ? "" : "s"} were saved to “${clippingFolder}”${failedDetail}.`);
-      } else if (failedImages) {
-        lines.push(`⚠️ “${title}” was saved to “${clippingFolder}” with the full text and ${savedImages} image${savedImages === 1 ? "" : "s"}; ${failedImages} additional image${failedImages === 1 ? "" : "s"} failed to save.`);
+        const failed = [];
+        if (failedImages) failed.push(`${failedImages} additional image${failedImages === 1 ? "" : "s"}`);
+        if (failedFiles) failed.push(`${failedFiles} original file${failedFiles === 1 ? "" : "s"}`);
+        const failedDetail = failed.length ? `; ${failed.join(" and ")} failed to save` : "";
+        lines.push(`⚠️ “${title}” was only partially extracted. ${partialEn[0].toUpperCase()}${partialEn.slice(1)} were saved to “${clippingFolder}”${failedDetail}.`);
+      } else if (failedImages || failedFiles) {
+        const failed = [];
+        if (failedImages) failed.push(`${failedImages} additional image${failedImages === 1 ? "" : "s"}`);
+        if (failedFiles) failed.push(`${failedFiles} original file${failedFiles === 1 ? "" : "s"}`);
+        lines.push(`⚠️ “${title}” was saved to “${clippingFolder}” with ${extractedEn}; ${failed.join(" and ")} failed to save.`);
       } else {
-        lines.push(`🔖 “${title}” was saved to “${clippingFolder}” with the full text and ${savedImages} image${savedImages === 1 ? "" : "s"}.`);
+        lines.push(`🔖 “${title}” was saved to “${clippingFolder}” with ${extractedEn}.${savedFileDetail}`);
       }
     } else {
       if (clip.article?.extractionStatus === "partial") {
-        const failedDetail = failedImages ? `，另有 ${failedImages} 张图片保存失败` : "";
-        lines.push(`⚠️ 《${title}》正文提取不完整，已保存正文片段和 ${savedImages} 张图片到「${clippingFolder}」${failedDetail}`);
-      } else if (failedImages) {
-        lines.push(`⚠️ 《${title}》已提取正文和 ${savedImages} 张图片并保存到「${clippingFolder}」，另有 ${failedImages} 张图片保存失败`);
+        const failedDetail = `${failedImages ? `，另有 ${failedImages} 张图片保存失败` : ""}${failedFiles ? `，${failedFiles} 个原文件保存失败` : ""}`;
+        lines.push(`⚠️ 《${title}》正文提取不完整，已保存${partialZh}到「${clippingFolder}」${failedDetail}`);
+      } else if (failedImages || failedFiles) {
+        const failedDetail = `${failedImages ? `，另有 ${failedImages} 张图片保存失败` : ""}${failedFiles ? `，${failedFiles} 个原文件保存失败` : ""}`;
+        lines.push(`⚠️ 《${title}》已提取${extractedZh}并保存到「${clippingFolder}」${failedDetail}`);
       } else {
-        lines.push(`🔖 《${title}》已提取正文和 ${savedImages} 张图片并保存到「${clippingFolder}」`);
+        lines.push(`🔖 《${title}》已提取${extractedZh}并保存到「${clippingFolder}」${savedFileDetail}`);
       }
     }
   }

@@ -11,6 +11,7 @@ Omnichannel Diary is an independent AGPL-3.0-only project. Its production bundle
 | `@whiskeysockets/baileys` | 7.0.0-rc14 | MIT | WhatsApp linked-device transport |
 | `dingtalk-stream` | 2.1.6-beta.1 | MIT | DingTalk Stream transport |
 | `linkedom` | 0.18.13 | ISC | HTML document implementation |
+| `pdf2json` | 3.2.2 | Apache-2.0 | Local text extraction from online PDF files |
 | `qrcode` | 1.5.4 | MIT | Local QR rendering |
 | `ws` | 8.21.3 | MIT | Slack and Discord WebSocket connections |
 

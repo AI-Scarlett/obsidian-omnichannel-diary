@@ -5,6 +5,7 @@ const path = require("node:path");
 const { Plugin, Notice } = require("obsidian");
 const { normalizeSettings } = require("./core/settings");
 const { appLocale, translate } = require("./core/i18n");
+const { WebSessionManager } = require("./core/browserclip");
 const { VaultWriter } = require("./core/vault");
 const { DiaryService } = require("./core/diary");
 const { CaptureRouter } = require("./core/router");
@@ -18,7 +19,8 @@ class OmnichannelDiaryPlugin extends Plugin {
     this.migrateLegacyRuntimeData();
     if (JSON.stringify(saved || {}) !== JSON.stringify(this.settings)) await this.saveSettings();
     this.writer = new VaultWriter(this.app.vault);
-    this.diary = new DiaryService(this.writer, () => this.settings, () => this.saveSettings());
+    this.webSessionManager = new WebSessionManager(this.channelDataPath("document-sessions", true));
+    this.diary = new DiaryService(this.writer, () => this.settings, () => this.saveSettings(), { sessionManager: this.webSessionManager });
     this.channelManager = new ChannelManager(this, async (envelope) => this.router.handle(envelope));
     this.router = new CaptureRouter(this.diary, () => this.channelManager.getStatuses(), {
       getLocale: () => this.locale(),
@@ -50,6 +52,7 @@ class OmnichannelDiaryPlugin extends Plugin {
 
   async onunload() {
     await this.channelManager?.stopAll();
+    await this.webSessionManager?.closeAll();
   }
 
   async saveSettings() {
