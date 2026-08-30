@@ -74,13 +74,34 @@ function nodeRequest(input, options = {}) {
   });
 }
 
+function isRetryableTransportError(error) {
+  return ["ECONNRESET", "ETIMEDOUT", "EAI_AGAIN", "ENETUNREACH", "EHOSTUNREACH"].includes(error?.code)
+    || /socket disconnected|timed? out|network connection was lost/i.test(error?.message || "");
+}
+
+async function requestWithRetry(input, options = {}, requester = nodeRequest) {
+  const method = String(options.method || "GET").toUpperCase();
+  const attempts = Math.max(1, Number(options.requestAttempts || (["GET", "HEAD"].includes(method) ? 3 : 1)));
+  const delays = options.retryDelays || [0, 250, 700];
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, delays[Math.min(attempt, delays.length - 1)] || 0));
+    try { return await requester(input, options); }
+    catch (error) {
+      lastError = error;
+      if (!isRetryableTransportError(error) || attempt === attempts - 1) throw error;
+    }
+  }
+  throw lastError || new Error("Request failed");
+}
+
 async function safeFetch(input, options = {}) {
   let url = (await validateResolvedHost(input)).toString();
   const maxRedirects = options.maxRedirects ?? 5;
   let method = options.method || "GET";
   let body = options.body;
   for (let redirect = 0; redirect <= maxRedirects; redirect += 1) {
-    const response = await nodeRequest(url, {
+    const response = await requestWithRetry(url, {
       method,
       headers: {
         "user-agent": USER_AGENT,
@@ -90,6 +111,8 @@ async function safeFetch(input, options = {}) {
       body,
       signal: options.signal || AbortSignal.timeout(options.timeoutMs || 30_000),
       timeoutMs: options.timeoutMs,
+      requestAttempts: options.requestAttempts,
+      retryDelays: options.retryDelays,
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location");
@@ -145,4 +168,4 @@ function decodeDataUrl(value, requestedName) {
   };
 }
 
-module.exports = { USER_AGENT, decodeDataUrl, downloadRemoteFile, nodeRequest, readLimitedBody, safeFetch, validateResolvedHost };
+module.exports = { USER_AGENT, decodeDataUrl, downloadRemoteFile, isRetryableTransportError, nodeRequest, readLimitedBody, requestWithRetry, safeFetch, validateResolvedHost };

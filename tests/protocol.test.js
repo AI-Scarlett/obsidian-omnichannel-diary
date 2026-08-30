@@ -37,7 +37,7 @@ test("WeChat requests identify the app and encode the plugin protocol version", 
   const value = headers("");
   assert.equal(value["ilink-app-id"], "bot");
   assert.equal(value["ilink-app-clientversion"], String(clientVersion(CHANNEL_VERSION)));
-  assert.equal(clientVersion("0.3.5"), 773);
+  assert.equal(clientVersion("0.3.6"), 774);
 });
 
 test("WhatsApp runtime normalizes wrapped text and media metadata", () => {

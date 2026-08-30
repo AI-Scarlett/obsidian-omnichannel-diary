@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
-const { nodeRequest, readLimitedBody } = require("../src/core/network");
+const { nodeRequest, readLimitedBody, requestWithRetry } = require("../src/core/network");
 
 test("node transport returns a fetch-like streaming response", async (t) => {
   const server = http.createServer((request, response) => {
@@ -30,4 +30,22 @@ test("node transport preserves body size enforcement", async (t) => {
   const address = server.address();
   const response = await nodeRequest(`http://127.0.0.1:${address.port}/`);
   await assert.rejects(() => readLimitedBody(response, 3), /exceeds 3 bytes/);
+});
+
+test("transport retries transient TLS resets but does not repeat unsafe methods by default", async () => {
+  let getAttempts = 0;
+  const response = await requestWithRetry("https://example.com", { method: "GET", retryDelays: [0] }, async () => {
+    getAttempts += 1;
+    if (getAttempts < 3) throw Object.assign(new Error("socket disconnected"), { code: "ECONNRESET" });
+    return { ok: true };
+  });
+  assert.equal(response.ok, true);
+  assert.equal(getAttempts, 3);
+
+  let postAttempts = 0;
+  await assert.rejects(() => requestWithRetry("https://example.com", { method: "POST", retryDelays: [0] }, async () => {
+    postAttempts += 1;
+    throw Object.assign(new Error("socket disconnected"), { code: "ECONNRESET" });
+  }), /socket disconnected/);
+  assert.equal(postAttempts, 1);
 });

@@ -4,6 +4,7 @@ const { Readability } = require("@mozilla/readability");
 const { parseHTML } = require("linkedom");
 const { downloadRemoteFile, readLimitedBody, safeFetch } = require("./network");
 const { localDateParts, safeFileName, shortHash, yamlString } = require("./util");
+const { extractXStatus } = require("./xclip");
 
 function absoluteUrl(value, baseUrl) {
   if (!value) return "";
@@ -121,6 +122,8 @@ class WebClipper {
   }
 
   async extract(url) {
+    const xStatus = await extractXStatus(url);
+    if (xStatus) return xStatus;
     const { response, finalUrl } = await safeFetch(url, { accept: "text/html,application/xhtml+xml", timeoutMs: 30_000 });
     if (!response.ok) throw new Error(`Page returned HTTP ${response.status}`);
     const contentType = response.headers.get("content-type") || "";
