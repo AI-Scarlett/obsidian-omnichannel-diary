@@ -1,6 +1,42 @@
 "use strict";
 
+const crypto = require("node:crypto");
 const timers = require("node:timers");
+
+function createOutboundReplyTracker({ maxAgeMs = 5 * 60 * 1000, maxEntries = 200 } = {}) {
+  const entries = new Map();
+  const prune = (now = Date.now()) => {
+    for (const [id, timestamp] of entries) {
+      if (now - timestamp <= maxAgeMs && entries.size <= maxEntries) break;
+      entries.delete(id);
+    }
+  };
+  return {
+    remember(id, now = Date.now()) {
+      if (!id) return;
+      entries.set(id, now);
+      prune(now);
+    },
+    consume(id, now = Date.now()) {
+      prune(now);
+      if (!id || !entries.has(id)) return false;
+      entries.delete(id);
+      return true;
+    },
+    forget(id) { entries.delete(id); },
+    get size() { return entries.size; },
+  };
+}
+
+function shouldCaptureMessage(message, options = {}) {
+  if (!message?.message) return false;
+  if (!message.key?.fromMe) return true;
+  if (options.consumeOutboundReply?.(message.key?.id || "")) return false;
+  const sameUser = options.sameUser || ((left, right) => left === right);
+  const chatIds = [message.key?.remoteJid, message.key?.remoteJidAlt].filter(Boolean);
+  const ownIds = (options.ownIds || []).filter(Boolean);
+  return chatIds.some((chatId) => ownIds.some((ownId) => sameUser(chatId, ownId)));
+}
 
 function silentLogger() {
   const logger = { level: "silent", trace() {}, debug() {}, info() {}, warn() {}, error() {}, fatal() {} };
@@ -63,6 +99,7 @@ async function runWhatsAppWorker(options = {}) {
   const logger = silentLogger();
   let socket;
   let stopped = false;
+  const outboundReplies = createOutboundReplyTracker();
   let closeRuntime;
   const runtimeClosed = new Promise((resolve) => { closeRuntime = resolve; });
 
@@ -98,7 +135,12 @@ async function runWhatsAppWorker(options = {}) {
     socket.ev.on("messages.upsert", async ({ messages, type }) => {
       if (type !== "notify") return;
       for (const message of messages || []) {
-        if (!message.message || message.key?.fromMe) continue;
+        const ownIds = [socket.user?.id, socket.user?.lid, socket.user?.phoneNumber];
+        if (!shouldCaptureMessage(message, {
+          ownIds,
+          sameUser: baileys.areJidsSameUser,
+          consumeOutboundReply: (id) => outboundReplies.consume(id),
+        })) continue;
         try {
           const content = unwrapMessage(message.message);
           const id = message.key?.id || `${Date.now()}`;
@@ -110,14 +152,15 @@ async function runWhatsAppWorker(options = {}) {
             else attachments.push({ ...media, error: "附件超过 25 MB，未保存" });
           }
           const jid = message.key?.remoteJid || "";
+          const fromSelf = Boolean(message.key?.fromMe);
           emit({
             type: "message",
             value: {
               id,
               timestamp: Number(message.messageTimestamp || 0) * 1000 || Date.now(),
-              senderId: message.key?.participant || jid,
-              senderName: message.pushName || message.key?.participant || jid,
-              chatName: jid,
+              senderId: fromSelf ? (socket.user?.id || "whatsapp-self") : (message.key?.participant || jid),
+              senderName: fromSelf ? (socket.user?.name || socket.user?.notify || "本人") : (message.pushName || message.key?.participant || jid),
+              chatName: fromSelf ? "给自己发消息" : jid,
               isGroup: jid.endsWith("@g.us"),
               text: messageText(content),
               attachments,
@@ -133,8 +176,11 @@ async function runWhatsAppWorker(options = {}) {
 
   const onMessage = async (message) => {
     if (message?.type === "reply" && socket && message.jid) {
-      try { await socket.sendMessage(message.jid, { text: String(message.text || "") }); }
+      const messageId = crypto.randomBytes(10).toString("hex").toUpperCase();
+      outboundReplies.remember(messageId);
+      try { await socket.sendMessage(message.jid, { text: String(message.text || "") }, { messageId }); }
       catch (error) {
+        outboundReplies.forget(messageId);
         emit({ type: "status", state: "error", detail: `WhatsApp 回复失败：${error?.message || error}` });
         throw error;
       }
@@ -151,4 +197,4 @@ async function runWhatsAppWorker(options = {}) {
   if (!stopped) await runtimeClosed;
 }
 
-module.exports = { mediaInfo, messageText, runWhatsAppWorker, unwrapMessage };
+module.exports = { createOutboundReplyTracker, mediaInfo, messageText, runWhatsAppWorker, shouldCaptureMessage, unwrapMessage };
