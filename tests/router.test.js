@@ -69,7 +69,7 @@ test("capture receipts use the same friendly format across all nine channels", a
     "🔖 《月入30万美元，这位英国老兵把最“土”的网站做到了月访问791万》已提取正文和 7 张图片并保存到「全渠道剪藏」",
     "",
     "嗨~ 我是你的随手记 Agent ✍️",
-    "想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取支持的文章、云文档、PDF，以及国内外技术社区的帖子、问答和评论串，存成 Markdown 剪藏，并在今天的笔记里留入口。记的东西在 Obsidian 的「日记」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。",
+    "想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取支持的文章、云文档、PDF，以及国内外技术社区的帖子、问答和评论串，存成 Markdown 剪藏，并在今天的笔记里留入口。代码平台地址会按你的设置提取、分类收藏，或两者都做。记的东西在 Obsidian 的「日记」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。",
   ].join("\n"));
 });
 
@@ -161,4 +161,27 @@ test("PDF receipts distinguish a saved original from an original-file failure", 
   });
   assert.match(failed, /^⚠️/);
   assert.match(failed, /1 个原文件保存失败/);
+});
+
+test("code-platform bookmarks use the same bilingual receipt format", () => {
+  const result = {
+    diaryPath: "日记/today.md",
+    diaryFolder: "日记",
+    codePlatformFolder: "代码平台收藏",
+    codeLinks: [{ name: "GitHub", repository: "openai/openai-node", notePath: "代码平台收藏/GitHub/openai-openai-node.md" }],
+    clips: [], clipFailures: [], codeLinkFailures: [], attachmentFailures: [],
+  };
+  const zh = formatCaptureReceipt(result);
+  assert.match(zh, /^🔗 已将 GitHub 的「openai\/openai-node」分类保存到「代码平台收藏」/);
+  assert.doesNotMatch(zh, /^✍️/);
+  const en = formatCaptureReceipt({ ...result, diaryPath: "Daily/today.md", diaryFolder: "Daily", codePlatformFolder: "Code Links" }, "en");
+  assert.match(en, /^🔗 Saved “openai\/openai-node” from GitHub to “Code Links”\./);
+  assert.doesNotMatch(en, /[\u4e00-\u9fff]/);
+});
+
+test("code-platform filing failures keep the original URL in the daily note receipt", () => {
+  const zh = formatCaptureReceipt({ diaryPath: "日记/today.md", clips: [], codeLinks: [], clipFailures: [], codeLinkFailures: ["failed"], attachmentFailures: [] });
+  assert.match(zh, /^⚠️ 1 个代码平台地址未能分类保存/);
+  const en = formatCaptureReceipt({ diaryPath: "Daily/today.md", clips: [], codeLinks: [], clipFailures: [], codeLinkFailures: ["failed"], attachmentFailures: [] }, "en");
+  assert.match(en, /^⚠️ 1 code-platform link could not be filed/);
 });

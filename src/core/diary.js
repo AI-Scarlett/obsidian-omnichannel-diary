@@ -1,6 +1,7 @@
 "use strict";
 
 const { downloadRemoteFile, decodeDataUrl } = require("./network");
+const { CodePlatformBookmarkStore, classifyCodePlatformUrl, normalizeCodePlatformMode } = require("./code-platforms");
 const { WebClipper } = require("./webclip");
 const { extractUrls, localDateParts, markdownEscape, safeFileName, shortHash } = require("./util");
 
@@ -10,6 +11,7 @@ class DiaryService {
     this.getSettings = getSettings;
     this.onSettingsChanged = onSettingsChanged;
     this.sessionManager = options.sessionManager;
+    this.webClipperFactory = options.webClipperFactory || ((writer, settings, clipperOptions) => new WebClipper(writer, settings, clipperOptions));
   }
 
   messageKey(envelope) {
@@ -98,13 +100,27 @@ class DiaryService {
 
     const clips = [];
     const clipFailures = [];
+    const codeLinks = [];
+    const codeLinkFailures = [];
     if (settings.capture.autoClipLinks) {
-      const clipper = new WebClipper(this.writer, settings, { sessionManager: this.sessionManager });
+      const clipper = this.webClipperFactory(this.writer, settings, { sessionManager: this.sessionManager });
+      const codeStore = new CodePlatformBookmarkStore(this.writer, settings);
+      const codeMode = normalizeCodePlatformMode(settings.capture.codePlatformMode);
       for (const url of extractUrls(envelope.text).slice(0, 5)) {
-        try {
-          clips.push(await clipper.save(url, { channel: envelope.channel, timestamp: envelope.timestamp }));
-        } catch (error) {
-          clipFailures.push(`${url}: ${error?.message || error}`);
+        const codePlatform = classifyCodePlatformUrl(url, settings.capture.codePlatformAdditionalHosts);
+        if (codePlatform && (codeMode === "bookmark" || codeMode === "both")) {
+          try {
+            codeLinks.push(await codeStore.save(url, { channel: envelope.channel, timestamp: envelope.timestamp }, codePlatform));
+          } catch (error) {
+            codeLinkFailures.push(`${url}: ${error?.message || error}`);
+          }
+        }
+        if (!codePlatform || codeMode === "extract" || codeMode === "both") {
+          try {
+            clips.push(await clipper.save(url, { channel: envelope.channel, timestamp: envelope.timestamp }));
+          } catch (error) {
+            clipFailures.push(`${url}: ${error?.message || error}`);
+          }
         }
       }
     }
@@ -113,8 +129,10 @@ class DiaryService {
     const lines = [`\n## ${title}\n`, String(envelope.text || "").trim() || "_无文字内容_", ""];
     if (attachmentLines.length) lines.push(...attachmentLines, "");
     for (const clip of clips) lines.push(`- 网页剪藏：[[${clip.notePath.replace(/\.md$/i, "")}]]（本地图片 ${clip.savedImages} 张）`);
+    for (const link of codeLinks) lines.push(`- 代码平台收藏：[[${link.notePath.replace(/\.md$/i, "")}]]（${link.name} · ${link.repository}）`);
     if (attachmentFailures.length) lines.push(`> [!warning] ${attachmentFailures.length} 个聊天附件保存失败\n> ${attachmentFailures.join("\n> ")}`);
     if (clipFailures.length) lines.push(`> [!warning] ${clipFailures.length} 个链接提取失败，原始链接已保留\n> ${clipFailures.join("\n> ")}`);
+    if (codeLinkFailures.length) lines.push(`> [!warning] ${codeLinkFailures.length} 个代码平台地址分类保存失败，原始链接已保留\n> ${codeLinkFailures.join("\n> ")}`);
     if (settings.storage.addSourceMetadata) {
       lines.push(`> [!info] 来源\n> 渠道：${envelope.channelName || envelope.channel} · 会话：${envelope.chatName || "私聊"} · 消息 ID：${envelope.id || "无"}`);
     }
@@ -127,10 +145,13 @@ class DiaryService {
       diaryPath,
       diaryFolder: settings.storage.diaryFolder,
       clippingFolder: settings.storage.clippingFolder,
+      codePlatformFolder: settings.storage.codePlatformFolder,
       clips,
+      codeLinks,
       savedAttachments: attachmentLines.length,
       attachmentFailures,
       clipFailures,
+      codeLinkFailures,
       messageKey,
     };
   }

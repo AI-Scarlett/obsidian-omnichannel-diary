@@ -23,10 +23,10 @@ function formatAgentGuide(result = {}, locale = "zh-CN") {
   const diaryFolder = displayFolder(result.diaryFolder || folderFromPath(result.diaryPath, diaryFallback), diaryFallback);
   return locale === "en" ? [
     "Hi! I'm your quick-capture Agent ✍️",
-    `Send me any text, voice note, image, or file and I'll add it to today's note. Send a web link and I'll extract supported articles, cloud documents, PDFs, technical-community posts, answers, and comment threads into a Markdown clipping with an entry in today's note. Your notes are stored in the “${diaryFolder}” folder. To change it, open Obsidian Settings → Community plugins → Omnichannel Diary → Storage & privacy → Daily notes. If something needs correcting, edit it directly in Obsidian. Send “help” anytime to see all commands.`,
+    `Send me any text, voice note, image, or file and I'll add it to today's note. Send a web link and I'll extract supported articles, cloud documents, PDFs, technical-community posts, answers, and comment threads into a Markdown clipping with an entry in today's note. Code-platform links follow your selected rule: extract, file as a categorized bookmark, or both. Your notes are stored in the “${diaryFolder}” folder. To change it, open Obsidian Settings → Community plugins → Omnichannel Diary → Storage & privacy → Daily notes. If something needs correcting, edit it directly in Obsidian. Send “help” anytime to see all commands.`,
   ].join("\n") : [
     "嗨~ 我是你的随手记 Agent ✍️",
-    `想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取支持的文章、云文档、PDF，以及国内外技术社区的帖子、问答和评论串，存成 Markdown 剪藏，并在今天的笔记里留入口。记的东西在 Obsidian 的「${diaryFolder}」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。`,
+    `想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取支持的文章、云文档、PDF，以及国内外技术社区的帖子、问答和评论串，存成 Markdown 剪藏，并在今天的笔记里留入口。代码平台地址会按你的设置提取、分类收藏，或两者都做。记的东西在 Obsidian 的「${diaryFolder}」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。`,
   ].join("\n");
 }
 
@@ -35,12 +35,14 @@ function formatHelpText(locale = "zh-CN", result = {}) {
     "Available commands:",
     "• Send text, a voice note, an image, or a file: add it to today's note",
     "• Send a web link: extract articles, cloud documents, PDFs, images, technical-community posts, answers, and supported comment threads into a Markdown clipping",
+    "• Send a code-platform link: extract it, file it as a categorized bookmark, or do both according to Capture rules",
     "• /clip <URL>: clip only the specified page",
     "• /status: show the current channel connection status",
   ] : [
     "可用指令：",
     "• 直接发送文字、语音、图片或文件：写入今天的笔记",
     "• 直接发送网页链接：提取文章、云文档、PDF、图片，以及技术社区帖子、问答和支持的评论串，生成 Markdown 剪藏",
+    "• 发送代码平台地址：按收集规则提取正文、分类收藏地址，或两者都做",
     "• /clip <链接>：只剪藏指定网页",
     "• /status：查看当前渠道连接状态",
   ];
@@ -51,13 +53,17 @@ const HELP_TEXT = formatHelpText("zh-CN");
 
 function formatCaptureReceipt(result, locale = "zh-CN") {
   const clips = result.clips || [];
+  const codeLinks = result.codeLinks || [];
   const clipFailures = result.clipFailures?.length || 0;
+  const codeLinkFailures = result.codeLinkFailures?.length || 0;
   const attachmentFailures = result.attachmentFailures?.length || 0;
   const savedAttachments = Number(result.savedAttachments) || 0;
   const diaryFallback = translate(locale, "日记", "Daily");
   const clippingFallback = translate(locale, "全渠道剪藏", "Clippings");
+  const codePlatformFallback = translate(locale, "代码平台收藏", "Code Links");
   const diaryFolder = displayFolder(result.diaryFolder || folderFromPath(result.diaryPath, diaryFallback), diaryFallback);
   const clippingFolder = displayFolder(result.clippingFolder || folderFromPath(clips[0]?.notePath, clippingFallback), clippingFallback);
+  const codePlatformFolder = displayFolder(result.codePlatformFolder || folderFromPath(codeLinks[0]?.notePath, codePlatformFallback), codePlatformFallback);
   const lines = [];
 
   for (const clip of clips) {
@@ -104,15 +110,25 @@ function formatCaptureReceipt(result, locale = "zh-CN") {
     }
   }
 
+  for (const link of codeLinks) {
+    const repository = displayTitle(link.repository || link.title || link.url, locale);
+    const platform = displayTitle(link.name || link.hostname || translate(locale, "代码平台", "Code platform"), locale);
+    lines.push(locale === "en"
+      ? `🔗 Saved “${repository}” from ${platform} to “${codePlatformFolder}”.`
+      : `🔗 已将 ${platform} 的「${repository}」分类保存到「${codePlatformFolder}」`);
+  }
+
   if (locale === "en") {
-    if (!clips.length && !clipFailures) lines.push(`✍️ Saved to today's note in “${diaryFolder}”.`);
+    if (!clips.length && !codeLinks.length && !clipFailures && !codeLinkFailures) lines.push(`✍️ Saved to today's note in “${diaryFolder}”.`);
     if (savedAttachments) lines.push(`📎 Saved ${savedAttachments} attachment${savedAttachments === 1 ? "" : "s"} to today's note in “${diaryFolder}”.`);
     if (clipFailures) lines.push(`⚠️ ${clipFailures} web page${clipFailures === 1 ? "" : "s"} could not be extracted. The original link${clipFailures === 1 ? " was" : "s were"} kept in today's note in “${diaryFolder}”.`);
+    if (codeLinkFailures) lines.push(`⚠️ ${codeLinkFailures} code-platform link${codeLinkFailures === 1 ? "" : "s"} could not be filed. The original link${codeLinkFailures === 1 ? " was" : "s were"} kept in today's note in “${diaryFolder}”.`);
     if (attachmentFailures) lines.push(`⚠️ ${attachmentFailures} attachment${attachmentFailures === 1 ? "" : "s"} failed to save. The original message was kept in today's note in “${diaryFolder}”.`);
   } else {
-    if (!clips.length && !clipFailures) lines.push(`✍️ 已保存到今天的「${diaryFolder}」`);
+    if (!clips.length && !codeLinks.length && !clipFailures && !codeLinkFailures) lines.push(`✍️ 已保存到今天的「${diaryFolder}」`);
     if (savedAttachments) lines.push(`📎 已保存 ${savedAttachments} 个附件到今天的「${diaryFolder}」`);
     if (clipFailures) lines.push(`⚠️ ${clipFailures} 个网页未能提取正文，原始链接已保存在今天的「${diaryFolder}」`);
+    if (codeLinkFailures) lines.push(`⚠️ ${codeLinkFailures} 个代码平台地址未能分类保存，原始链接已保存在今天的「${diaryFolder}」`);
     if (attachmentFailures) lines.push(`⚠️ ${attachmentFailures} 个附件保存失败，原消息已保存在今天的「${diaryFolder}」`);
   }
   return `${lines.join("\n")}\n\n${formatAgentGuide({ ...result, diaryFolder }, locale)}`;

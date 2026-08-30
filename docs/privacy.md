@@ -6,6 +6,7 @@ The plugin writes:
 
 - daily Markdown notes;
 - extracted web-page Markdown notes;
+- categorized code-platform bookmark notes;
 - downloaded chat attachments and page images;
 - plugin settings and channel credentials in `data.json`;
 - WhatsApp linked-device state under `.channel-data/whatsapp-auth`.
@@ -27,6 +28,7 @@ Network access is initiated only for enabled features:
 - Discord: `discord.com` API and Discord Gateway/CDN;
 - WhatsApp: endpoints selected by the bundled linked-device transport;
 - Web clipping: the supplied page URL, redirect targets, image/resource URLs found in its readable content, direct PDF files, public endpoints used for Reddit, Hacker News, GitHub, Stack Exchange, DEV/Forem, Discourse, and V2EX, plus rendered cloud-document and registered community pages.
+- Code-platform links: bookmark-only mode performs no request to the supplied code-platform URL; extraction and combined modes use the web-clipping destinations above.
 
 The direct web clipper validates every HTTP(S) redirect and DNS result. The dynamic renderer intercepts browser requests and applies the same public-host validation before continuing them. Both reject localhost, link-local ranges, private IPv4 ranges, private IPv6 ranges, and non-HTTP protocols.
 

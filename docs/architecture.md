@@ -4,7 +4,7 @@ The plugin has four product layers:
 
 1. A channel adapter converts a platform event into a small capture envelope.
 2. A deterministic router handles `/help`, `/status`, and `/clip`; all other content goes directly to capture.
-3. The diary service de-duplicates message IDs, saves chat attachments, and invokes adapter-based web clipping for HTTP(S) links.
+3. The diary service de-duplicates message IDs, saves chat attachments, routes recognized code-platform URLs through the user's extract/bookmark/both rule, and invokes adapter-based web clipping for remaining HTTP(S) links.
 4. The Vault writer serializes appends and creates folders, Markdown files, and binary assets through the Obsidian Vault API.
 
 The web clipping layer routes known content before generic Readability extraction:
@@ -19,6 +19,8 @@ The web clipping layer routes known content before generic Readability extractio
 - other HTML pages use Readability and the existing local-image pipeline.
 
 There is no model invocation or semantic decision layer.
+
+The code-platform registry is separate from community extraction. It describes stable host families and URL shapes, classifies repository/resource metadata locally, and supports user-supplied self-hosted domains. Bookmark notes are idempotent by normalized URL and grouped by platform in a dedicated folder.
 
 ## Runtime packaging
 
@@ -36,6 +38,7 @@ This keeps the three-file Obsidian release format without relying on Electron's 
 - A channel connection failure changes only that channel's status.
 - A failed attachment is written as a warning in the daily note.
 - A failed web extraction leaves the original URL in the daily entry.
+- A failed code-platform bookmark write leaves the original URL in the daily entry; in combined mode it does not hide an independent extraction result.
 - A failed web image remains a remote Markdown image and is counted in the clipping warning.
 - A private document or challenged community page without a valid isolated session fails explicitly; the challenge/login page is never reported as extracted content.
 - A 403, access-denied page, or rendered body shorter than the acceptance threshold is not reported as a successful clipping; the normal HTML fallback is tried before the original URL is retained as a failure.

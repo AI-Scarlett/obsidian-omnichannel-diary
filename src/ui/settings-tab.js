@@ -3,6 +3,7 @@
 const QRCode = require("qrcode");
 const { Modal, Notice, PluginSettingTab, Setting, setIcon } = require("obsidian");
 const { CHANNEL_IDS, clearChannelCredentials, getChannelMeta } = require("../core/settings");
+const { codePlatformCoverage } = require("../core/code-platforms");
 const { COMMUNITY_SERVICES, DOCUMENT_SERVICES, communityCoverage } = require("../core/web-platforms");
 const { shortHash } = require("../core/util");
 
@@ -155,8 +156,8 @@ class ManualCaptureModal extends Modal {
     this.titleEl.setText(this.plugin.t("保存到 Omnichannel Diary", "Save to Omnichannel Diary"));
     this.contentEl.addClass("od-manual-modal");
     this.contentEl.createEl("p", { text: this.plugin.t(
-      "粘贴文字或网页链接。链接会按当前规则提取文章、云文档、PDF，以及技术社区的帖子、问答、评论与图片。",
-      "Paste text or a web link. Links use the current rules for articles, cloud documents, PDFs, and technical-community posts, answers, comments, and images.",
+      "粘贴文字或网页链接。普通链接会提取文章、云文档、PDF 和技术社区内容；代码平台地址按设置提取、分类收藏，或两者都做。",
+      "Paste text or a web link. Regular links extract articles, cloud documents, PDFs, and technical-community content. Code-platform links are extracted, filed as categorized bookmarks, or both according to your settings.",
     ) });
     const textarea = this.contentEl.createEl("textarea", { cls: "od-manual-input" });
     textarea.setAttr("rows", "7");
@@ -238,8 +239,8 @@ class DiarySettingTab extends PluginSettingTab {
     copy.createDiv({ cls: "od-eyebrow", text: "LOCAL-FIRST CAPTURE" });
     copy.createEl("h1", { text: "Omnichannel Diary" });
     copy.createEl("p", { text: this.tr(
-      "把聊天里的灵感、网页、云文档、PDF、技术社区讨论和附件，可靠地沉淀到当前 Obsidian Vault。没有 AI 路由，也不会把笔记上传到中间服务。",
-      "Capture ideas, web pages, cloud documents, PDFs, technical-community discussions, and attachments into this Obsidian Vault. No AI routing and no intermediary note-upload service.",
+      "把聊天里的灵感、网页、代码平台地址、云文档、PDF、技术社区讨论和附件，可靠地沉淀到当前 Obsidian Vault。没有 AI 路由，也不会把笔记上传到中间服务。",
+      "Capture ideas, web pages, code-platform links, cloud documents, PDFs, technical-community discussions, and attachments into this Obsidian Vault. No AI routing and no intermediary note-upload service.",
     ) });
     const actions = hero.createDiv({ cls: "od-hero-actions" });
     iconButton(actions, this.tr("手动保存", "Manual capture"), "square-pen", () => new ManualCaptureModal(this.app, this.plugin).open(), "is-primary");
@@ -303,11 +304,11 @@ class DiarySettingTab extends PluginSettingTab {
     const list = steps.createDiv({ cls: "od-step-list" });
     for (const [number, title, text] of (this.locale() === "en" ? [
       ["01", "Choose a channel", "Authorize with a QR code or enter the bot credentials issued by the platform."],
-      ["02", "Send content", "Text goes to the daily note; supported pages, documents, PDFs, technical posts, answers, and comments become clippings; attachments stay local."],
+      ["02", "Send content", "Text goes to the daily note; pages become clippings; code-platform links follow their dedicated filing rule; attachments stay local."],
       ["03", "Return to Obsidian", "Each day has one note with clear sources, failures, and local attachments."],
     ] : [
       ["01", "选择渠道", "扫码授权，或填入平台签发的 Bot 凭据。"],
-      ["02", "发送内容", "文字写入日记；支持的网页、云文档、PDF、技术帖子、问答与评论生成剪藏；附件保存在本地。"],
+      ["02", "发送内容", "文字写入日记；网页生成剪藏；代码平台地址按专用规则分类；附件保存在本地。"],
       ["03", "回到 Obsidian", "每天一篇日记，来源、失败项和本地附件都有明确记录。"],
     ])) {
       const step = list.createDiv({ cls: "od-step" });
@@ -428,10 +429,12 @@ class DiarySettingTab extends PluginSettingTab {
     for (const [key, name, desc] of (this.locale() === "en" ? [
       ["diaryFolder", "Daily notes", "Creates YYYY-MM-DD.md using the local date"],
       ["clippingFolder", "Web clippings", "Article text and source metadata"],
+      ["codePlatformFolder", "Code-platform links", "Categorized bookmark notes grouped by platform"],
       ["attachmentFolder", "Local attachments", "Stores chat attachments and web images in separate subfolders"],
     ] : [
       ["diaryFolder", "每日笔记", "按本地日期生成 YYYY-MM-DD.md"],
       ["clippingFolder", "网页剪藏", "正文与来源元数据"],
+      ["codePlatformFolder", "代码平台收藏", "按平台分组保存代码仓库与资源地址"],
       ["attachmentFolder", "本地附件", "聊天附件与网页图片分目录保存"],
     ])) {
       new Setting(storage).setName(name).setDesc(desc).addText((input) => input.setValue(this.plugin.settings.storage[key]).onChange(async (value) => {
@@ -455,6 +458,50 @@ class DiarySettingTab extends PluginSettingTab {
         this.plugin.settings.capture.maxFileMb = Math.min(100, Math.max(1, Number(value) || 20)); await this.plugin.saveSettings();
       });
     });
+    const codePlatforms = parent.createDiv({ cls: "od-panel" });
+    codePlatforms.createEl("h3", { text: this.tr("代码平台地址", "Code-platform links") });
+    codePlatforms.createEl("p", { text: this.tr(
+      "仓库主页、Issue、PR / MR、Release、Commit、文件页等会先识别平台，再按下面的规则处理。选择“只分类收藏”时不会打开目标网页。",
+      "Repository pages, issues, PRs / MRs, releases, commits, and file pages are identified before processing. “File bookmark only” does not open the target page.",
+    ) });
+    new Setting(codePlatforms)
+      .setName(this.tr("处理方式", "Handling mode"))
+      .setDesc(this.tr("只影响识别出的代码平台地址；普通网页继续按网页剪藏规则处理。", "Only affects recognized code-platform links. Regular web pages continue to use the web-clipping rules."))
+      .addDropdown((dropdown) => dropdown
+        .addOptions(this.locale() === "en" ? {
+          extract: "Extract page content",
+          bookmark: "File bookmark only",
+          both: "Extract and file bookmark",
+        } : {
+          extract: "提取网页正文",
+          bookmark: "只分类收藏地址",
+          both: "提取正文并分类收藏",
+        })
+        .setValue(this.plugin.settings.capture.codePlatformMode)
+        .onChange(async (value) => {
+          this.plugin.settings.capture.codePlatformMode = value;
+          await this.plugin.saveSettings();
+        }));
+    new Setting(codePlatforms)
+      .setName(this.tr("附加平台域名", "Additional platform hosts"))
+      .setDesc(this.tr(
+        "可填写自建 GitLab、Gitea、Forgejo 或公司内部代码平台域名；多个域名用逗号分隔，不要填写令牌。",
+        "Add self-hosted GitLab, Gitea, Forgejo, or internal code-platform hosts. Separate hosts with commas and never enter tokens.",
+      ))
+      .addText((input) => input
+        .setPlaceholder("git.example.com, code.example.org")
+        .setValue(this.plugin.settings.capture.codePlatformAdditionalHosts)
+        .onChange(async (value) => {
+          this.plugin.settings.capture.codePlatformAdditionalHosts = value;
+          await this.plugin.saveSettings();
+        }));
+    const codeGrid = codePlatforms.createDiv({ cls: "od-support-grid" });
+    for (const [region, titleZh, titleEn] of [["international", "国外平台", "International"], ["china", "国内平台", "China"]]) {
+      const group = codeGrid.createDiv({ cls: "od-support-group" });
+      group.createEl("h4", { text: this.tr(titleZh, titleEn) });
+      const tags = group.createDiv({ cls: "od-support-tags" });
+      for (const service of codePlatformCoverage(region)) tags.createSpan({ cls: "od-support-tag is-api", text: service.name });
+    }
     const coverage = parent.createDiv({ cls: "od-panel" });
     coverage.createEl("h3", { text: this.tr("技术社区覆盖", "Technical-community coverage") });
     coverage.createEl("p", { text: this.tr(
@@ -541,7 +588,8 @@ class DiarySettingTab extends PluginSettingTab {
     const local = parent.createDiv({ cls: "od-panel od-privacy-panel" });
     local.createEl("h3", { text: this.tr("本地保存", "Local storage") });
     const points = local.createEl("ul");
-    points.createEl("li", { text: this.tr("消息正文、网页正文和下载成功的附件写入当前 Vault。", "Message text, web articles, and successfully downloaded attachments are written to the current Vault.") });
+    points.createEl("li", { text: this.tr("消息正文、网页正文、代码平台收藏和下载成功的附件写入当前 Vault。", "Message text, web articles, code-platform bookmarks, and successfully downloaded attachments are written to the current Vault.") });
+    points.createEl("li", { text: this.tr("代码平台选择“只分类收藏地址”时，插件只解析 URL 并写入本地笔记，不访问目标网页。", "When code-platform handling is set to “File bookmark only,” the plugin parses the URL and writes a local note without visiting the target page.") });
     points.createEl("li", { text: this.tr("Bot Token、App Secret、扫码凭据与云文档浏览器会话保存在插件 data.json 或 .channel-data 目录，未做额外加密。", "Bot tokens, app secrets, QR credentials, and cloud-document browser sessions are stored in the plugin's data.json or .channel-data directory without additional encryption.") });
     points.createEl("li", { text: this.tr("插件不会扫描与收集目录无关的笔记，也不会自动发布任何内容。", "The plugin does not scan notes outside its capture workflow and never publishes content automatically.") });
     const network = parent.createDiv({ cls: "od-panel od-privacy-panel" });
@@ -551,7 +599,7 @@ class DiarySettingTab extends PluginSettingTab {
       "Enabled channels connect to their official API/CDN. Clipping visits link, article-image, and dynamic-page resource hosts. localhost, local networks, and private IPs are blocked.",
     ) });
     const chips = network.createDiv({ cls: "od-domain-chips" });
-    for (const domain of ["weixin.qq.com", "feishu.cn / larksuite.com", "docs.qq.com", "kdocs.cn / wps.cn", "reddit.com", "producthunt.com", "dingtalk.com", "work.weixin.qq.com", "qq.com", "slack.com", "telegram.org", "discord.com", "whatsapp.net"]) {
+    for (const domain of ["github.com / gitlab.com", "gitee.com / gitcode.com", "bitbucket.org / codeberg.org", "dev.azure.com / git.sr.ht", "weixin.qq.com", "feishu.cn / larksuite.com", "docs.qq.com", "kdocs.cn / wps.cn", "reddit.com", "producthunt.com", "dingtalk.com", "work.weixin.qq.com", "qq.com", "slack.com", "telegram.org", "discord.com", "whatsapp.net"]) {
       chips.createEl("code", { text: domain });
     }
     const credentials = parent.createDiv({ cls: "od-panel" });

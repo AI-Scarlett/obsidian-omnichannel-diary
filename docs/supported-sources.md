@@ -2,6 +2,20 @@
 
 Omnichannel Diary uses three extraction layers. A structured public adapter is preferred where a platform exposes stable post/comment data. Registered dynamic pages use a Vault-owned Chromium profile. All other pages retain the generic Readability path, with automatic forum/comment detection when common conversation markup is present.
 
+## Code-platform links
+
+Code-hosting URLs are recognized before ordinary clipping. The user chooses one deterministic rule for repository pages and resources such as issues, pull/merge requests, discussions, releases, commits, trees, and files:
+
+- **Extract page content** uses the normal structured/rendered/Readability clipping path.
+- **File bookmark only** writes a small Markdown record under `<Code-platform folder>/<Platform>` and does not request the target URL.
+- **Extract and file bookmark** performs both operations independently, so a categorized link can still be retained if page extraction fails.
+
+Built-in international platforms: GitHub, GitLab, Bitbucket, Azure DevOps, Codeberg, SourceHut, SourceForge, Launchpad, GNU Savannah, Hugging Face Hub, GitFlic, and Google Git.
+
+Built-in China platforms: Gitee, GitCode, JiHu GitLab, CODING, AtomGit, and GitLink.
+
+Additional self-hosted GitLab, Gitea, Forgejo, and internal code-platform hostnames can be entered in settings. The setting accepts hostnames only and must never contain credentials or tokens.
+
 ## Structured sources
 
 | Source | Saved content | Fallback |

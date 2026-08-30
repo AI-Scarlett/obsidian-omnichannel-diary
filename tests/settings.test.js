@@ -13,19 +13,30 @@ test("clean settings expose exactly nine channels and no model configuration", (
 test("saved values are merged, folders normalized, and unknown inherited keys dropped", () => {
   const settings = normalizeSettings({
     schemaVersion: 1,
-    storage: { diaryFolder: "/Notes\\Diary/" },
-    capture: { maxFileMb: 500 },
+    storage: { diaryFolder: "/Notes\\Diary/", codePlatformFolder: "/Dev\\Links/" },
+    capture: { maxFileMb: 500, codePlatformMode: "bookmark", codePlatformAdditionalHosts: "https://git.example.com/a, code.example.org" },
     channels: { telegram: { enabled: true, botToken: "secret" } },
     inheritedLegacyKey: "must disappear",
   });
   assert.equal(settings.storage.diaryFolder, "Notes/Diary");
+  assert.equal(settings.storage.codePlatformFolder, "Dev/Links");
   assert.equal(settings.capture.maxFileMb, 100);
+  assert.equal(settings.capture.codePlatformMode, "bookmark");
+  assert.equal(settings.capture.codePlatformAdditionalHosts, "git.example.com, code.example.org");
   assert.equal(settings.channels.telegram.botToken, "secret");
   assert.equal(settings.inheritedLegacyKey, undefined);
   assert.deepEqual(settings.runtime.pendingReceipts, []);
   assert.equal(settings.ui.language, "auto");
   assert.equal(settings.capture.renderDynamicPages, true);
   assert.equal(settings.capture.browserExecutable, "");
+});
+
+test("new code-platform settings keep existing installs on extraction mode", () => {
+  const settings = normalizeSettings({ schemaVersion: 1, storage: { diaryFolder: "日记" } });
+  assert.equal(settings.storage.codePlatformFolder, "Omnichannel Diary/Code Links");
+  assert.equal(settings.capture.codePlatformMode, "extract");
+  assert.equal(settings.capture.codePlatformAdditionalHosts, "");
+  assert.equal(normalizeSettings({ schemaVersion: 1, capture: { codePlatformMode: "delete" } }).capture.codePlatformMode, "extract");
 });
 
 test("language choice is preserved and invalid values fall back to Obsidian auto detection", () => {
@@ -57,6 +68,8 @@ test("legacy data keeps user folders and WeChat authorization while removing obs
   const settings = normalizeSettings(migrated);
   assert.equal(settings.storage.diaryFolder, "旧日记");
   assert.equal(settings.storage.clippingFolder, "旧剪藏");
+  assert.equal(settings.storage.codePlatformFolder, DEFAULT_SETTINGS.storage.codePlatformFolder);
+  assert.equal(settings.capture.codePlatformMode, "extract");
   assert.equal(settings.channels.wechat.token, "wechat-token");
   assert.equal(settings.channels.wechat.enabled, true);
   assert.equal(JSON.stringify(settings).includes("unused"), false);

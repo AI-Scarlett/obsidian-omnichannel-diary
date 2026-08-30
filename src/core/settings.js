@@ -1,6 +1,7 @@
 "use strict";
 
 const { normalizeLanguagePreference } = require("./i18n");
+const { normalizeAdditionalHosts, normalizeCodePlatformMode } = require("./code-platforms");
 
 const CHANNEL_IDS = ["wechat", "feishu", "dingtalk", "wecom", "qq", "slack", "telegram", "discord", "whatsapp"];
 
@@ -44,11 +45,14 @@ const DEFAULT_SETTINGS = {
   storage: {
     diaryFolder: "Omnichannel Diary/Daily",
     clippingFolder: "Omnichannel Diary/Clippings",
+    codePlatformFolder: "Omnichannel Diary/Code Links",
     attachmentFolder: "Omnichannel Diary/Attachments",
     addSourceMetadata: true,
   },
   capture: {
     autoClipLinks: true,
+    codePlatformMode: "extract",
+    codePlatformAdditionalHosts: "",
     downloadWebImages: true,
     renderDynamicPages: true,
     browserExecutable: "",
@@ -91,7 +95,10 @@ function normalizeSettings(saved) {
   const value = deepMerge(DEFAULT_SETTINGS, source);
   value.storage.diaryFolder = sanitizeFolder(value.storage.diaryFolder, DEFAULT_SETTINGS.storage.diaryFolder);
   value.storage.clippingFolder = sanitizeFolder(value.storage.clippingFolder, DEFAULT_SETTINGS.storage.clippingFolder);
+  value.storage.codePlatformFolder = sanitizeFolder(value.storage.codePlatformFolder, DEFAULT_SETTINGS.storage.codePlatformFolder);
   value.storage.attachmentFolder = sanitizeFolder(value.storage.attachmentFolder, DEFAULT_SETTINGS.storage.attachmentFolder);
+  value.capture.codePlatformMode = normalizeCodePlatformMode(value.capture.codePlatformMode);
+  value.capture.codePlatformAdditionalHosts = normalizeAdditionalHosts(value.capture.codePlatformAdditionalHosts).join(", ");
   value.capture.maxFileMb = Math.min(100, Math.max(1, Number(value.capture.maxFileMb) || 20));
   value.capture.browserExecutable = String(value.capture.browserExecutable || "").trim();
   value.ui.language = normalizeLanguagePreference(value.ui.language);
@@ -117,11 +124,14 @@ function migrateLegacySettings(saved) {
     storage: {
       diaryFolder: legacySettings.diaryFolder || DEFAULT_SETTINGS.storage.diaryFolder,
       clippingFolder: legacySettings.webClipFolder || DEFAULT_SETTINGS.storage.clippingFolder,
+      codePlatformFolder: DEFAULT_SETTINGS.storage.codePlatformFolder,
       attachmentFolder: DEFAULT_SETTINGS.storage.attachmentFolder,
       addSourceMetadata: legacySettings.includeChannelLabel !== false,
     },
     capture: {
       autoClipLinks: legacySettings.webClipEnabled !== false,
+      codePlatformMode: "extract",
+      codePlatformAdditionalHosts: "",
       downloadWebImages: legacySettings.webClipSaveImages !== false,
       renderDynamicPages: true,
       browserExecutable: "",
