@@ -13,6 +13,7 @@ Version 0.3.x is an independent implementation. It does not contain source code 
 - If page extraction or an image download fails, the original URL remains in the daily note.
 - WeChat and WhatsApp use the same deterministic receipt text. Receipts are retried and kept pending locally until the channel confirms that they were sent.
 - WeChat messages are marked processed and its polling cursor is advanced only after the Vault write succeeds.
+- WeChat replies include the complete iLink Bot envelope (`client_id`, bot message type, finished state, and the inbound `context_token`) required for mobile delivery.
 
 All folders and capture rules are configurable.
 

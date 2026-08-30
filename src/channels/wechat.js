@@ -6,6 +6,13 @@ const { readLimitedBody, safeFetch } = require("../core/network");
 
 const DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com";
 const CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c";
+const CHANNEL_VERSION = "0.3.4";
+const ILINK_APP_ID = "bot";
+
+function clientVersion(value) {
+  const parts = String(value).split(".").map((part) => Number.parseInt(part, 10) || 0);
+  return ((parts[0] & 0xff) << 16) | ((parts[1] & 0xff) << 8) | (parts[2] & 0xff);
+}
 
 function randomUin() {
   return Buffer.from(String(crypto.randomBytes(4).readUInt32BE(0)), "utf8").toString("base64");
@@ -35,14 +42,36 @@ function headers(token) {
     "content-type": "application/json",
     authorizationtype: "ilink_bot_token",
     "x-wechat-uin": randomUin(),
+    "ilink-app-id": ILINK_APP_ID,
+    "ilink-app-clientversion": String(clientVersion(CHANNEL_VERSION)),
     ...(token ? { authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function replyClientId() {
+  return `omnichannel-diary:${Date.now()}-${crypto.randomBytes(8).toString("hex")}`;
+}
+
+function buildTextReply(message, text, clientId = replyClientId()) {
+  if (!message?.from_user_id) throw new Error("微信消息缺少发送者 ID，无法回复");
+  if (!message?.context_token) throw new Error("微信消息缺少 context_token，无法回复");
+  return {
+    msg: {
+      from_user_id: "",
+      to_user_id: message.from_user_id,
+      client_id: clientId,
+      message_type: 2,
+      message_state: 2,
+      context_token: message.context_token,
+      item_list: [{ type: 1, text_item: { text: String(text || "") } }],
+    },
   };
 }
 
 async function ilinkJson(baseUrl, endpoint, options = {}) {
   const body = options.body === undefined ? undefined : JSON.stringify({
     ...options.body,
-    base_info: { channel_version: "2.1.0", bot_agent: "OmnichannelDiary/0.3" },
+    base_info: { channel_version: CHANNEL_VERSION, bot_agent: `OmnichannelDiary/${CHANNEL_VERSION}` },
   });
   const { response } = await safeFetch(`${String(baseUrl || DEFAULT_BASE_URL).replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`, {
     method: options.method || (body ? "POST" : "GET"),
@@ -176,6 +205,7 @@ class WeChatChannel extends BaseChannel {
       if (message.message_type !== 1) continue;
       const items = message.item_list || [];
       const attachments = items.map(itemAttachment).filter(Boolean);
+      const outboundClientId = replyClientId();
       const delivery = await this.deliver({
         id: String(message.message_id || message.seq || `${message.from_user_id}-${message.create_time_ms}`),
         timestamp: new Date(Number(message.create_time_ms) || Date.now()),
@@ -186,7 +216,7 @@ class WeChatChannel extends BaseChannel {
         attachments,
         reply: async (text) => ilinkJson(this.config.baseUrl || DEFAULT_BASE_URL, "ilink/bot/sendmessage", {
           token: this.config.token,
-          body: { msg: { to_user_id: message.from_user_id, context_token: message.context_token, item_list: [{ type: 1, text_item: { text } }] } },
+          body: buildTextReply(message, text, outboundClientId),
         }),
       });
       if (delivery?.ok === false) throw delivery.error;
@@ -207,4 +237,4 @@ class WeChatChannel extends BaseChannel {
   }
 }
 
-module.exports = { WeChatChannel, downloadIlinkMedia, ilinkJson, parseAesKey, randomUin };
+module.exports = { CHANNEL_VERSION, WeChatChannel, buildTextReply, clientVersion, downloadIlinkMedia, headers, ilinkJson, parseAesKey, randomUin, replyClientId };
