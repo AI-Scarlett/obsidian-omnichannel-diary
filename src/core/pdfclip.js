@@ -1,35 +1,68 @@
 "use strict";
 
-const PDFParser = require("pdf2json");
+let pdfJsPromise;
+
+function loadPdfJs() {
+  if (!pdfJsPromise) pdfJsPromise = import("pdfjs-dist/legacy/build/pdf.mjs");
+  return pdfJsPromise;
+}
 
 function decodePdfText(value) {
   try { return decodeURIComponent(String(value || "").replace(/\+/g, "%20")); }
   catch (_) { return String(value || ""); }
 }
 
-function pageText(page) {
-  const fragments = [];
-  for (const item of page?.Texts || []) {
-    const text = (item.R || []).map((run) => decodePdfText(run.T)).join("");
-    if (text) fragments.push({ x: Number(item.x) || 0, y: Number(item.y) || 0, text });
-  }
-  fragments.sort((a, b) => Math.abs(a.y - b.y) < 0.18 ? a.x - b.x : a.y - b.y);
+function pageText(textContent) {
   const lines = [];
-  for (const fragment of fragments) {
+  for (const item of textContent?.items || []) {
+    const text = String(item?.str || "");
+    if (!text) continue;
+    const x = Number(item?.transform?.[4]) || 0;
+    const y = Number(item?.transform?.[5]) || 0;
+    const height = Math.max(1, Math.abs(Number(item?.height) || Number(item?.transform?.[3]) || 0));
     const previous = lines.at(-1);
-    if (!previous || Math.abs(previous.y - fragment.y) >= 0.18) lines.push({ y: fragment.y, text: fragment.text });
-    else previous.text += fragment.text;
+    const startsNewLine = !previous || previous.hasEOL || Math.abs(previous.y - y) > Math.max(2, height * 0.45);
+    if (startsNewLine) {
+      lines.push({ y, endX: x + (Number(item?.width) || 0), text, hasEOL: Boolean(item?.hasEOL) });
+      continue;
+    }
+    const gap = x - previous.endX;
+    const separator = gap > Math.max(1.5, height * 0.12) && !/\s$/.test(previous.text) && !/^\s/.test(text) ? " " : "";
+    previous.text += `${separator}${text}`;
+    previous.endX = Math.max(previous.endX, x + (Number(item?.width) || 0));
+    previous.hasEOL = Boolean(item?.hasEOL);
   }
   return lines.map((line) => line.text.trim()).join("\n").trim();
 }
 
-function parsePdfBuffer(buffer, parserFactory = () => new PDFParser(null, 1)) {
-  return new Promise((resolve, reject) => {
-    const parser = parserFactory();
-    parser.once("pdfParser_dataError", (error) => reject(error?.parserError || error));
-    parser.once("pdfParser_dataReady", resolve);
-    parser.parseBuffer(Buffer.from(buffer));
+async function parsePdfBuffer(buffer, pdfjsLoader = loadPdfJs) {
+  const pdfjs = await pdfjsLoader();
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    isEvalSupported: false,
+    useSystemFonts: true,
   });
+  const document = await loadingTask.promise;
+  try {
+    const metadata = await document.getMetadata().catch(() => ({}));
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      pages.push(await page.getTextContent());
+      page.cleanup();
+    }
+    const info = metadata?.info || {};
+    const xmp = metadata?.metadata;
+    return {
+      Meta: {
+        Title: info.Title || xmp?.get?.("dc:title") || "",
+        Author: info.Author || xmp?.get?.("dc:creator") || "",
+      },
+      Pages: pages,
+    };
+  } finally {
+    await document.destroy();
+  }
 }
 
 function fileNameFromHeaders(url, contentDisposition = "") {
@@ -44,7 +77,7 @@ function fileNameFromHeaders(url, contentDisposition = "") {
 }
 
 async function extractPdf(buffer, url, contentDisposition = "", options = {}) {
-  const data = await parsePdfBuffer(buffer, options.parserFactory);
+  const data = await parsePdfBuffer(buffer, options.pdfjsLoader);
   const pages = data?.Pages || [];
   const parts = pages.map((page, index) => {
     const text = pageText(page);
@@ -70,4 +103,4 @@ async function extractPdf(buffer, url, contentDisposition = "", options = {}) {
   };
 }
 
-module.exports = { decodePdfText, extractPdf, fileNameFromHeaders, pageText, parsePdfBuffer };
+module.exports = { decodePdfText, extractPdf, fileNameFromHeaders, loadPdfJs, pageText, parsePdfBuffer };

@@ -1,6 +1,6 @@
 {
   "name": "obsidian-omnichannel-diary",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "Save messages, links, and attachments from chat channels to a local Obsidian vault.",
   "repository": {
@@ -26,7 +26,7 @@
     "@whiskeysockets/baileys": "7.0.0-rc14",
     "dingtalk-stream": "2.1.6-beta.1",
     "linkedom": "0.18.13",
-    "pdf2json": "3.2.2",
+    "pdfjs-dist": "5.4.296",
     "qrcode": "1.5.4",
     "ws": "8.21.3"
   },

@@ -15,6 +15,15 @@ if (!bundle.includes("runWhatsAppWorker")) failures.push("WhatsApp bundled runti
 if (bundle.includes("omnichannel-whatsapp-worker")) failures.push("bundle still starts WhatsApp through a V8 worker entry");
 if (bundle.includes("ELECTRON_RUN_AS_NODE")) failures.push("bundle still depends on disabled Electron run-as-node support");
 if (bundle.includes("whatsapp.worker.js")) failures.push("bundle still depends on a sibling worker");
+if (/createElement\s*\(\s*["']script["']\s*\)/i.test(bundle)) {
+  failures.push("bundle dynamically creates a script element");
+}
+if (/createElementNS\s*\([^)]*,\s*["']script["']\s*\)/i.test(bundle)) {
+  failures.push("bundle dynamically creates a namespaced script element");
+}
+if (/\.setAttribute\s*\(\s*["']src["']\s*,[^)]*\)[^;]{0,500}appendChild/i.test(bundle)) {
+  failures.push("bundle contains a dynamic script loading pattern");
+}
 const productionDependencies = Object.keys(packageJson.dependencies || {});
 if (productionDependencies.some((name) => /^(?:openai|@anthropic-ai\/)/i.test(name))
   || /(?:api\.openai\.com\/v1|api\.anthropic\.com|OPENAI_API_KEY|ANTHROPIC_API_KEY|new\s+OpenAI\s*\(|new\s+Anthropic\s*\()/i.test(bundle)) {
