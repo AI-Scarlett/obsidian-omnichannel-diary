@@ -23,7 +23,7 @@
     "@mozilla/readability": "0.6.0",
     "@tencent-connect/qqbot-nodejs": "1.0.4",
     "@wecom/aibot-node-sdk": "1.0.7",
-    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "@whiskeysockets/baileys": "6.7.22",
     "dingtalk-stream": "2.1.6-beta.1",
     "linkedom": "0.18.13",
     "pdfjs-dist": "5.4.296",

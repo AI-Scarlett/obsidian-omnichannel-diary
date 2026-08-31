@@ -27,7 +27,12 @@ const CHANNEL_FIELDS = {
   slack: [{ key: "appToken", zh: "App Token", en: "App token", placeholder: "xapp-…", secret: true }, { key: "botToken", zh: "Bot Token", en: "Bot token", placeholder: "xoxb-…", secret: true }],
   telegram: [{ key: "botToken", zh: "Bot Token", en: "Bot token", placeholder: "123456:…", secret: true }],
   discord: [{ key: "botToken", zh: "Bot Token", en: "Bot token", secret: true }],
-  whatsapp: [],
+  whatsapp: [{
+    key: "nodePath",
+    zh: "Node.js 路径（可选）",
+    en: "Node.js path (optional)",
+    placeholder: process.platform === "win32" ? "C:\\Program Files\\nodejs\\node.exe" : "/opt/homebrew/bin/node",
+  }],
 };
 
 const SETUP_LINKS = {
@@ -389,8 +394,8 @@ class DiarySettingTab extends PluginSettingTab {
       "Uses official WeChat iLink / ClawBot authorization, not web-login or device emulation. Availability depends on your account's rollout access.",
     ));
     else if (id === "whatsapp") note.setText(this.tr(
-      "通过 WhatsApp 官方“已关联设备”扫码。现有授权会直接重连；重新扫码前会先把旧凭据移入可恢复备份。",
-      "Uses the official WhatsApp Linked Devices QR flow. Existing authorization reconnects directly; rescanning first moves old credentials to a recoverable backup.",
+      "通过 WhatsApp 官方“已关联设备”扫码。连接在独立 Node.js 20.18+ 进程中运行，避免 WhatsApp 故障导致 Obsidian 白屏；通常会自动查找 Node.js。",
+      "Uses the official WhatsApp Linked Devices QR flow in an isolated Node.js 20.18+ process so a WhatsApp failure cannot blank Obsidian. Node.js is normally detected automatically.",
     ));
     else if (["telegram", "discord", "slack"].includes(id)) note.setText(this.tr(
       "该平台的官方 Bot 接口不提供个人账号扫码接入；请从官方开发者入口创建 Bot 并粘贴令牌。",

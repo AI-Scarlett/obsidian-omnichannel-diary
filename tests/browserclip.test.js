@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { WebSessionManager, commentSelectorsForService, looksLikeAuthentication, looksLikeBlockedPage, renderedPayloadExpression, selectorsForService } = require("../src/core/browserclip");
+const { WebSessionManager, commentSelectorsForService, isSupportedBrowserExecutablePath, looksLikeAuthentication, looksLikeBlockedPage, renderedPayloadExpression, selectorsForService } = require("../src/core/browserclip");
 const { communityServiceForUrl, documentServiceForUrl, isLikelyPdfUrl, isProductHuntUrl, renderServiceForUrl } = require("../src/core/web-platforms");
 const { WebClipper } = require("../src/core/webclip");
 
@@ -25,6 +25,13 @@ test("login pages are detected without treating normal private document text as 
   assert.equal(looksLikeAuthentication({ url: "https://docs.qq.com/doc/abc", text: "这是腾讯文档正文。".repeat(300) }, "tencent"), false);
   assert.equal(looksLikeBlockedPage({ title: "403 Forbidden", text: "403 Forbidden" }), true);
   assert.equal(looksLikeBlockedPage({ title: "An article", text: "Useful public text".repeat(300) }), false);
+});
+
+test("browser sessions only accept supported absolute browser executables", () => {
+  assert.equal(isSupportedBrowserExecutablePath("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"), true);
+  assert.equal(isSupportedBrowserExecutablePath("/usr/bin/chromium"), true);
+  assert.equal(isSupportedBrowserExecutablePath("relative/chrome"), false);
+  assert.equal(isSupportedBrowserExecutablePath("/tmp/arbitrary-tool"), false);
 });
 
 test("WebClipper uses an injected persistent renderer for dynamic documents", async () => {

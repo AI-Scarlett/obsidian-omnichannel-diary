@@ -61,7 +61,7 @@ styles.css
 
 Then reload Obsidian, open **Settings → Community plugins**, and enable **Omnichannel Diary**.
 
-WhatsApp does not require a sibling worker file or a system Node installation. Its transport is bundled into the installed `main.js` and runs inside the Obsidian plugin process.
+WhatsApp requires an installed Node.js 20.18 or later runtime. Its transport remains bundled in `main.js`, but runs as an isolated Node process so protocol failures cannot crash the Obsidian renderer. The plugin never downloads a runtime or executes a shell command; it launches only an allowlisted `node` / `node.exe` path with fixed arguments.
 
 ## Configure
 
@@ -83,6 +83,7 @@ The **Storage & privacy** page explains every local and network data boundary an
 - Web clipping connects to the submitted page, its image/resource hosts, public community APIs selected by the registry, and any selected cloud-document/community site.
 - Code-platform bookmark-only mode parses the URL and writes a local categorized note without requesting that URL. Extract and combined modes use the normal clipping network path.
 - Dynamic cloud documents and challenged community pages use an installed Chrome, Edge, Brave, or Chromium executable with a Vault-specific profile. No browser is downloaded or installed by the plugin.
+- Direct filesystem access is limited to the plugin's `.channel-data` runtime state and checks for allowlisted Node/browser executable paths. External processes are started with fixed argument arrays and without a shell.
 - Localhost, link-local, private IP ranges, and redirects to those addresses are blocked.
 - There is no telemetry, advertising, remote configuration, automatic publishing, self-update mechanism, or runtime package installation.
 
@@ -104,8 +105,9 @@ The production build is generated from `src/main.js`. Verification checks the in
 1. Keep `manifest.json`, `package.json`, and `versions.json` on the same version.
 2. Run `npm ci && npm run verify`.
 3. Create a GitHub release whose tag is the exact version, for example `1.0.0` (no `v` prefix).
-4. Attach `main.js`, `manifest.json`, and `styles.css` to the release.
-5. Submit the repository through [Obsidian's community plugin submission page](https://community.obsidian.md/).
+4. Generate GitHub build-provenance attestations for `main.js`, `manifest.json`, and `styles.css`.
+5. Attach `main.js`, `manifest.json`, and `styles.css` to the release.
+6. Submit the repository through [Obsidian's community plugin submission page](https://community.obsidian.md/).
 
 The repository must remain public and its source must correspond to the release bundle.
 

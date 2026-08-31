@@ -9,6 +9,14 @@ const CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c";
 const CHANNEL_VERSION = "0.3.4";
 const ILINK_APP_ID = "bot";
 
+function isOfficialWechatRemoteUrl(input) {
+  let parsed;
+  try { parsed = input instanceof URL ? input : new URL(input); } catch (_) { return false; }
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  return parsed.protocol === "https:"
+    && (hostname === "weixin.qq.com" || hostname.endsWith(".weixin.qq.com"));
+}
+
 function clientVersion(value) {
   const parts = String(value).split(".").map((part) => Number.parseInt(part, 10) || 0);
   return ((parts[0] & 0xff) << 16) | ((parts[1] & 0xff) << 8) | (parts[2] & 0xff);
@@ -30,7 +38,11 @@ function parseAesKey(value, preferredHex) {
 async function downloadIlinkMedia(media, preferredHex) {
   if (!media) throw new Error("WeChat media reference is missing");
   const url = media.full_url || `${CDN_BASE_URL}/download?encrypted_query_param=${encodeURIComponent(media.encrypt_query_param || "")}`;
-  const { response } = await safeFetch(url, { accept: "application/octet-stream", timeoutMs: 30_000 });
+  const { response } = await safeFetch(url, {
+    accept: "application/octet-stream",
+    timeoutMs: 30_000,
+    allowPrivateResolvedHost: isOfficialWechatRemoteUrl,
+  });
   if (!response.ok) throw new Error(`WeChat CDN returned HTTP ${response.status}`);
   const encrypted = await readLimitedBody(response, 100 * 1024 * 1024);
   const decipher = crypto.createDecipheriv("aes-128-ecb", parseAesKey(media.aes_key, preferredHex), null);
@@ -80,6 +92,7 @@ async function ilinkJson(baseUrl, endpoint, options = {}) {
     accept: "application/json",
     timeoutMs: options.timeoutMs || 45_000,
     signal: options.signal,
+    allowPrivateResolvedHost: isOfficialWechatRemoteUrl,
   });
   const text = (await readLimitedBody(response, 2 * 1024 * 1024)).toString("utf8");
   if (!response.ok) throw new Error(`WeChat API returned HTTP ${response.status}`);
@@ -237,4 +250,4 @@ class WeChatChannel extends BaseChannel {
   }
 }
 
-module.exports = { CHANNEL_VERSION, WeChatChannel, buildTextReply, clientVersion, downloadIlinkMedia, headers, ilinkJson, parseAesKey, randomUin, replyClientId };
+module.exports = { CHANNEL_VERSION, WeChatChannel, buildTextReply, clientVersion, downloadIlinkMedia, headers, ilinkJson, isOfficialWechatRemoteUrl, parseAesKey, randomUin, replyClientId };

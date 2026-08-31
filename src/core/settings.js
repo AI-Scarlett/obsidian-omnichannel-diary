@@ -70,7 +70,7 @@ const DEFAULT_SETTINGS = {
     slack: { enabled: false, appToken: "", botToken: "" },
     telegram: { enabled: false, botToken: "", offset: 0 },
     discord: { enabled: false, botToken: "" },
-    whatsapp: { enabled: false },
+    whatsapp: { enabled: false, nodePath: "" },
   },
   runtime: { recentMessageIds: [], pendingReceipts: [] },
 };
@@ -156,7 +156,7 @@ function migrateLegacySettings(saved) {
       slack: { enabled: Boolean(legacyChannels.slack?.enabled), appToken: "", botToken: "" },
       telegram: { enabled: Boolean(legacyChannels.telegram?.enabled), botToken: "", offset: 0 },
       discord: { enabled: Boolean(legacyChannels.discord?.enabled), botToken: "" },
-      whatsapp: { enabled: Boolean(legacyChannels.whatsapp?.enabled) },
+      whatsapp: { enabled: Boolean(legacyChannels.whatsapp?.enabled), nodePath: "" },
     },
     runtime: { recentMessageIds: [], pendingReceipts: [] },
   };

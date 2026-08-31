@@ -5,6 +5,7 @@ const path = require("node:path");
 const { Plugin, Notice } = require("obsidian");
 const { normalizeSettings } = require("./core/settings");
 const { appLocale, translate } = require("./core/i18n");
+const { findCompatibleNodeRuntime } = require("./core/node-runtime");
 const { WebSessionManager } = require("./core/browserclip");
 const { VaultWriter } = require("./core/vault");
 const { DiaryService } = require("./core/diary");
@@ -69,6 +70,27 @@ class OmnichannelDiaryPlugin extends Plugin {
 
   dataPath(name) {
     return this.channelDataPath(name, true);
+  }
+
+  runtimePath() {
+    const adapter = this.app.vault.adapter;
+    const basePath = typeof adapter.getBasePath === "function" ? adapter.getBasePath() : adapter.basePath;
+    if (!basePath) throw new Error(this.t("当前 Vault 适配器不支持独立运行进程", "The current Vault adapter does not support an isolated runtime process"));
+    return path.join(basePath, this.app.vault.configDir, "plugins", this.manifest.id, "main.js");
+  }
+
+  nodeRuntimePath() {
+    const configured = this.settings?.channels?.whatsapp?.nodePath || "";
+    if (this.cachedNodeRuntime?.configured === configured) return this.cachedNodeRuntime.path;
+    const result = findCompatibleNodeRuntime({ configured });
+    if (!result.path) {
+      throw new Error(this.t(
+        "WhatsApp 为避免导致 Obsidian 白屏，必须在独立 Node.js 20.18+ 进程中运行。未找到兼容的 Node.js；请安装 Node.js，或在 WhatsApp 设置中填写 node 程序路径。",
+        "To prevent an Obsidian renderer crash, WhatsApp must run in an isolated Node.js 20.18+ process. No compatible Node.js was found. Install Node.js or enter its executable path in WhatsApp settings.",
+      ));
+    }
+    this.cachedNodeRuntime = { configured, path: result.path, version: result.version };
+    return result.path;
   }
 
   channelDataPath(name, create = false) {

@@ -34,6 +34,10 @@ The direct web clipper validates every HTTP(S) redirect and DNS result. The dyna
 
 The dynamic renderer launches an already installed Chrome, Edge, Brave, or Chromium executable with a Vault-specific user-data directory. It does not read the user's normal browser profile or cookies, download a browser, install a package, upload session data, or enter credentials. Sign-in and human-verification steps happen only in a window the user explicitly opens.
 
+## Local process boundaries
+
+WhatsApp runs in an isolated Node.js 20.18+ process so a protocol failure cannot crash the Obsidian renderer. Dynamic document extraction may launch an installed Chromium-compatible browser. Both launches use fixed argument arrays with no shell, accept only allowlisted executable names, and never download or install an executable. Direct filesystem writes are scoped to `.channel-data` beneath this plugin's directory; system paths are only checked while locating an allowlisted Node or browser executable.
+
 ## Not performed
 
 The plugin has no telemetry, analytics, crash upload, hosted relay, AI provider, automatic publishing, advertising, remote feature flag, runtime dependency installer, or self-update code.

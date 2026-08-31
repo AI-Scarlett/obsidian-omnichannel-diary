@@ -20,9 +20,20 @@ const KNOWN_BROWSER_PATHS = process.platform === "darwin" ? [
   path.join(process.env.LOCALAPPDATA || "", "Google/Chrome/Application/chrome.exe"),
 ] : ["/usr/bin/google-chrome", "/usr/bin/microsoft-edge", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/brave-browser"];
 
+const SUPPORTED_BROWSER_NAMES = new Set([
+  "brave", "brave browser", "brave-browser", "brave.exe", "chrome", "chrome.exe", "chromium", "chromium-browser",
+  "google chrome", "google-chrome", "google-chrome-stable", "microsoft edge", "microsoft-edge", "msedge", "msedge.exe",
+]);
+
+function isSupportedBrowserExecutablePath(value) {
+  const requested = String(value || "").trim();
+  return path.isAbsolute(requested) && SUPPORTED_BROWSER_NAMES.has(path.basename(requested).toLowerCase());
+}
+
 function findBrowserExecutable(override = "") {
   const requested = String(override || "").trim();
   if (requested) {
+    if (!isSupportedBrowserExecutablePath(requested)) throw new Error("Configured executable is not a supported Chrome, Edge, Brave, or Chromium browser");
     if (!fs.existsSync(requested)) throw new Error(`Configured browser was not found: ${requested}`);
     return requested;
   }
@@ -401,6 +412,7 @@ module.exports = {
   WebSessionManager,
   commentSelectorsForService,
   findBrowserExecutable,
+  isSupportedBrowserExecutablePath,
   looksLikeBlockedPage,
   looksLikeAuthentication,
   renderedPayloadExpression,

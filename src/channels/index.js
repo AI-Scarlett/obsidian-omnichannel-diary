@@ -41,6 +41,8 @@ class ChannelManager {
       },
       saveSettings: () => this.plugin.saveSettings(),
       dataPath: (name) => this.plugin.dataPath(name),
+      runtimePath: () => this.plugin.runtimePath(),
+      nodeRuntimePath: () => this.plugin.nodeRuntimePath(),
       getLocale: () => this.plugin.locale(),
       t: (zh, en, values) => this.plugin.t(zh, en, values),
     };
@@ -107,6 +109,7 @@ class ChannelManager {
     if (!["wechat", "feishu", "whatsapp"].includes(id)) {
       throw new Error(this.plugin.t("此渠道的官方 Bot 接口不提供扫码授权", "This channel's official bot API does not support QR authorization"));
     }
+    const previousEnabled = Boolean(this.plugin.settings.channels[id].enabled);
     await this.stop(id);
     this.plugin.settings.channels[id].enabled = true;
     await this.plugin.saveSettings();
@@ -119,10 +122,16 @@ class ChannelManager {
     } catch (error) {
       try { await instance.stop(); } catch (_) {}
       this.instances.delete(id);
-      this.plugin.settings.channels[id].enabled = false;
+      this.plugin.settings.channels[id].enabled = previousEnabled;
       try { await this.plugin.saveSettings(); } catch (_) {}
-      this.statuses[id] = { state: "error", detail: error?.message || String(error) };
-      for (const listener of this.listeners) listener(this.getStatuses());
+      let resumeError = null;
+      if (previousEnabled) {
+        try { await this.start(id); } catch (restartError) { resumeError = restartError; }
+      }
+      if (!previousEnabled || resumeError) {
+        this.statuses[id] = { state: "error", detail: (resumeError || error)?.message || String(resumeError || error) };
+        for (const listener of this.listeners) listener(this.getStatuses());
+      }
       throw error;
     }
   }

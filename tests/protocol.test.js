@@ -3,7 +3,7 @@
 const crypto = require("node:crypto");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { CHANNEL_VERSION, buildTextReply, clientVersion, headers, parseAesKey, randomUin } = require("../src/channels/wechat");
+const { CHANNEL_VERSION, buildTextReply, clientVersion, headers, isOfficialWechatRemoteUrl, parseAesKey, randomUin } = require("../src/channels/wechat");
 const { createOutboundReplyTracker, messageText, mediaInfo, shouldCaptureMessage, unwrapMessage } = require("../src/worker/whatsapp");
 
 test("WeChat media keys accept raw base64 and base64-encoded hex", () => {
@@ -38,6 +38,15 @@ test("WeChat requests identify the app and encode the plugin protocol version", 
   assert.equal(value["ilink-app-id"], "bot");
   assert.equal(value["ilink-app-clientversion"], String(clientVersion(CHANNEL_VERSION)));
   assert.equal(clientVersion("0.3.6"), 774);
+});
+
+test("WeChat synthetic-address compatibility is limited to official HTTPS hosts", () => {
+  assert.equal(isOfficialWechatRemoteUrl("https://ilinkai.weixin.qq.com/ilink/bot/getupdates"), true);
+  assert.equal(isOfficialWechatRemoteUrl("https://novac2c.cdn.weixin.qq.com/c2c/download"), true);
+  assert.equal(isOfficialWechatRemoteUrl("https://liteapp.weixin.qq.com/path"), true);
+  assert.equal(isOfficialWechatRemoteUrl("http://ilinkai.weixin.qq.com/path"), false);
+  assert.equal(isOfficialWechatRemoteUrl("https://weixin.qq.com.evil.example/path"), false);
+  assert.equal(isOfficialWechatRemoteUrl("https://127.0.0.1/path"), false);
 });
 
 test("WhatsApp runtime normalizes wrapped text and media metadata", () => {

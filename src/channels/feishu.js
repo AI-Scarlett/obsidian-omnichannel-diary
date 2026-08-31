@@ -1,13 +1,66 @@
 "use strict";
 
-const Lark = require("@larksuiteoapi/node-sdk");
 const { BaseChannel } = require("./base");
 
-async function streamResponse(response, fileName, mimeType) {
-  const chunks = [];
-  for await (const chunk of response.getReadableStream()) chunks.push(Buffer.from(chunk));
+let larkRuntime;
+function loadLarkRuntime() {
+  if (!larkRuntime) larkRuntime = require("./feishu-sdk.mjs");
+  return larkRuntime;
+}
+
+function streamResponse(response, fileName, mimeType) {
   const headerType = response.headers?.["content-type"] || response.headers?.get?.("content-type");
-  return { buffer: Buffer.concat(chunks), fileName, mimeType: headerType || mimeType || "application/octet-stream" };
+  return { buffer: Buffer.from(response.data), fileName, mimeType: headerType || mimeType || "application/octet-stream" };
+}
+
+class FeishuApiClient {
+  constructor(config, domain, http) {
+    this.config = config;
+    this.domain = String(domain).replace(/\/$/, "");
+    this.http = http || loadLarkRuntime().defaultHttpInstance;
+    this.token = "";
+    this.tokenExpiresAt = 0;
+  }
+
+  async accessToken() {
+    if (this.token && Date.now() < this.tokenExpiresAt) return this.token;
+    const response = await this.http.post(`${this.domain}/open-apis/auth/v3/tenant_access_token/internal`, {
+      app_id: this.config.appId,
+      app_secret: this.config.appSecret,
+    });
+    if (!response?.tenant_access_token || (response.code !== undefined && response.code !== 0)) {
+      throw new Error(response?.msg || "Feishu tenant access token request failed");
+    }
+    this.token = response.tenant_access_token;
+    this.tokenExpiresAt = Date.now() + Math.max(60, Number(response.expire || 7200) - 120) * 1_000;
+    return this.token;
+  }
+
+  async headers() {
+    return { Authorization: `Bearer ${await this.accessToken()}` };
+  }
+
+  async resource(messageId, fileKey, type) {
+    return this.http.get(`${this.domain}/open-apis/im/v1/messages/${encodeURIComponent(messageId)}/resources/${encodeURIComponent(fileKey)}`, {
+      $return_headers: true,
+      headers: await this.headers(),
+      params: { type },
+      responseType: "arraybuffer",
+    });
+  }
+
+  async reply(chatId, text) {
+    const response = await this.http.post(`${this.domain}/open-apis/im/v1/messages`, {
+      receive_id: chatId,
+      msg_type: "text",
+      content: JSON.stringify({ text }),
+    }, {
+      headers: await this.headers(),
+      params: { receive_id_type: "chat_id" },
+    });
+    if (response?.code !== undefined && response.code !== 0) throw new Error(response.msg || "Feishu reply failed");
+    return response;
+  }
 }
 
 class FeishuChannel extends BaseChannel {
@@ -19,6 +72,7 @@ class FeishuChannel extends BaseChannel {
   }
 
   get clientDomain() {
+    const Lark = loadLarkRuntime();
     return this.config.domain === "lark" ? Lark.Domain.Lark : Lark.Domain.Feishu;
   }
 
@@ -27,6 +81,7 @@ class FeishuChannel extends BaseChannel {
   }
 
   async beginRegistration(callbacks = {}) {
+    const Lark = loadLarkRuntime();
     callbacks.onStatus?.(this.t("等待飞书 / Lark 官方授权…", "Waiting for official Feishu / Lark authorization…"));
     if (Lark.defaultHttpInstance?.defaults) Lark.defaultHttpInstance.defaults.adapter = "http";
     const controller = new AbortController();
@@ -59,7 +114,7 @@ class FeishuChannel extends BaseChannel {
       fileName,
       mimeType,
       load: async () => {
-        const response = await this.client.im.messageResource.get({ params: { type }, path: { message_id: messageId, file_key: fileKey } });
+        const response = await this.client.resource(messageId, fileKey, type);
         return streamResponse(response, fileName, mimeType);
       },
     };
@@ -92,19 +147,17 @@ class FeishuChannel extends BaseChannel {
       isGroup: message.chat_type === "group",
       text,
       attachments,
-      reply: async (replyText) => this.client.im.message.create({
-        params: { receive_id_type: "chat_id" },
-        data: { receive_id: message.chat_id, msg_type: "text", content: JSON.stringify({ text: replyText }) },
-      }),
+      reply: async (replyText) => this.client.reply(message.chat_id, replyText),
     };
   }
 
   async start() {
+    const Lark = loadLarkRuntime();
     this.assertFields(["appId", "appSecret"]);
     this.running = true;
     if (Lark.defaultHttpInstance?.defaults) Lark.defaultHttpInstance.defaults.adapter = "http";
     const baseConfig = { appId: this.config.appId, appSecret: this.config.appSecret, domain: this.clientDomain };
-    this.client = new Lark.Client(baseConfig);
+    this.client = new FeishuApiClient(this.config, this.clientDomain);
     this.wsClient = new Lark.WSClient({
       ...baseConfig,
       loggerLevel: Lark.LoggerLevel.error,
@@ -130,4 +183,4 @@ class FeishuChannel extends BaseChannel {
   }
 }
 
-module.exports = { FeishuChannel, streamResponse };
+module.exports = { FeishuApiClient, FeishuChannel, streamResponse };
