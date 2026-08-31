@@ -8,6 +8,15 @@ function loadLarkRuntime() {
   return larkRuntime;
 }
 
+const FEISHU_API_DOMAINS = Object.freeze({
+  feishu: "https://open.feishu.cn",
+  lark: "https://open.larksuite.com",
+});
+
+function apiDomainForRegion(region) {
+  return region === "lark" ? FEISHU_API_DOMAINS.lark : FEISHU_API_DOMAINS.feishu;
+}
+
 function streamResponse(response, fileName, mimeType) {
   const headerType = response.headers?.["content-type"] || response.headers?.get?.("content-type");
   return { buffer: Buffer.from(response.data), fileName, mimeType: headerType || mimeType || "application/octet-stream" };
@@ -74,6 +83,10 @@ class FeishuChannel extends BaseChannel {
   get clientDomain() {
     const Lark = loadLarkRuntime();
     return this.config.domain === "lark" ? Lark.Domain.Lark : Lark.Domain.Feishu;
+  }
+
+  get apiDomain() {
+    return apiDomainForRegion(this.config.domain);
   }
 
   get registrationDomain() {
@@ -157,7 +170,7 @@ class FeishuChannel extends BaseChannel {
     this.running = true;
     if (Lark.defaultHttpInstance?.defaults) Lark.defaultHttpInstance.defaults.adapter = "http";
     const baseConfig = { appId: this.config.appId, appSecret: this.config.appSecret, domain: this.clientDomain };
-    this.client = new FeishuApiClient(this.config, this.clientDomain);
+    this.client = new FeishuApiClient(this.config, this.apiDomain);
     this.wsClient = new Lark.WSClient({
       ...baseConfig,
       loggerLevel: Lark.LoggerLevel.error,
@@ -183,4 +196,4 @@ class FeishuChannel extends BaseChannel {
   }
 }
 
-module.exports = { FeishuApiClient, FeishuChannel, streamResponse };
+module.exports = { FeishuApiClient, FeishuChannel, apiDomainForRegion, streamResponse };

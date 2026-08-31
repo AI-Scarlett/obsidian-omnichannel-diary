@@ -2,7 +2,14 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { FeishuApiClient, streamResponse } = require("../src/channels/feishu");
+const { FeishuApiClient, FeishuChannel, apiDomainForRegion, streamResponse } = require("../src/channels/feishu");
+
+test("Feishu and Lark lightweight API calls use absolute official API domains", () => {
+  assert.equal(apiDomainForRegion("feishu"), "https://open.feishu.cn");
+  assert.equal(apiDomainForRegion("lark"), "https://open.larksuite.com");
+  assert.equal(new FeishuChannel({ domain: "feishu" }, {}).apiDomain, "https://open.feishu.cn");
+  assert.equal(new FeishuChannel({ domain: "lark" }, {}).apiDomain, "https://open.larksuite.com");
+});
 
 test("Feishu lightweight API client caches tokens and uses only scoped message endpoints", async () => {
   const calls = [];
