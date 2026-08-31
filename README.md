@@ -84,6 +84,7 @@ The **Storage & privacy** page explains every local and network data boundary an
 - Code-platform bookmark-only mode parses the URL and writes a local categorized note without requesting that URL. Extract and combined modes use the normal clipping network path.
 - Dynamic cloud documents and challenged community pages use an installed Chrome, Edge, Brave, or Chromium executable with a Vault-specific profile. No browser is downloaded or installed by the plugin.
 - Direct filesystem access is limited to the plugin's `.channel-data` runtime state and checks for allowlisted Node/browser executable paths. External processes are started with fixed argument arrays and without a shell.
+- The isolated WhatsApp process runs the bundle that Obsidian already loaded; the plugin does not target, replace, unpack, or write its own release files. HTTP `gzip` and `deflate` responses use explicit stream decoders and are never treated as plugin archives.
 - Localhost, link-local, private IP ranges, and redirects to those addresses are blocked.
 - There is no telemetry, advertising, remote configuration, automatic publishing, self-update mechanism, or runtime package installation.
 

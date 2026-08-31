@@ -24,6 +24,22 @@ const disablePdfDynamicCode = {
   },
 };
 
+const useExplicitHttpDecoders = {
+  name: "use-explicit-http-decoders",
+  setup(build) {
+    build.onLoad({ filter: /axios[\\/](?:lib[\\/]adapters[\\/]http\.js|dist[\\/]node[\\/]axios\.cjs)$/ }, async ({ path }) => {
+      let source = await readFile(path, "utf8");
+      const marker = "streams.push(zlib.createUnzip(zlibOptions));";
+      const matches = source.split(marker).length - 1;
+      if (matches !== 2) throw new Error(`Expected two Axios automatic decoder calls in ${path}, found ${matches}`);
+      source = source.replace(marker, "streams.push(zlib.createGunzip(zlibOptions));");
+      source = source.replace(marker, "streams.push(zlib.createInflate(zlibOptions));");
+      source = source.replace("'gzip, compress, deflate'", "'gzip, deflate'");
+      return { contents: source, loader: "js" };
+    });
+  },
+};
+
 await esbuild.build({
   entryPoints: ["src/main.js"],
   bundle: true,
@@ -44,7 +60,7 @@ await esbuild.build({
     ...builtinModules,
     ...builtinModules.map((name) => `node:${name}`),
   ],
-  plugins: [disablePdfDynamicCode],
+  plugins: [disablePdfDynamicCode, useExplicitHttpDecoders],
   legalComments: "eof",
   minify: true,
   sourcemap: false,

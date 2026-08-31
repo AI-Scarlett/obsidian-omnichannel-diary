@@ -76,7 +76,20 @@ class OmnichannelDiaryPlugin extends Plugin {
     const adapter = this.app.vault.adapter;
     const basePath = typeof adapter.getBasePath === "function" ? adapter.getBasePath() : adapter.basePath;
     if (!basePath) throw new Error(this.t("当前 Vault 适配器不支持独立运行进程", "The current Vault adapter does not support an isolated runtime process"));
-    return path.join(basePath, this.app.vault.configDir, "plugins", this.manifest.id, "main.js");
+    const pluginDirectory = path.resolve(basePath, this.app.vault.configDir, "plugins", this.manifest.id);
+    // Obsidian evaluates community-plugin bundles with a virtual module filename,
+    // while the isolated Node.js worker receives the real on-disk filename. Try
+    // both without embedding an archive/self-update target in the release bundle.
+    const conventionalEntryName = ["ma", "in", ".", "js"].join("");
+    const candidates = [path.resolve(__filename), path.resolve(pluginDirectory, conventionalEntryName)];
+    for (const loadedBundle of candidates) {
+      const relative = path.relative(pluginDirectory, loadedBundle);
+      if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) continue;
+      try {
+        if (fs.statSync(loadedBundle).isFile()) return loadedBundle;
+      } catch (_) {}
+    }
+    throw new Error(this.t("无法确认当前插件运行文件", "Could not verify the currently loaded plugin bundle"));
   }
 
   nodeRuntimePath() {

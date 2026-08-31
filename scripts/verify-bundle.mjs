@@ -29,6 +29,9 @@ if (/\.setAttribute\s*\(\s*["']src["']\s*,[^)]*\)[^;]{0,500}appendChild/i.test(b
 }
 if (/\beval\s*\(|new\s+Function\s*\(/.test(bundle)) failures.push("bundle contains dynamic code execution");
 if (/getconf GNU_LIBC_VERSION|ldd --version/.test(bundle)) failures.push("bundle contains optional dependency shell probes");
+if (/createUnzip|extractAllTo|extractEntryTo/i.test(bundle)) failures.push("bundle contains an archive-like extraction signature");
+if (bundle.includes("manifest.json")) failures.push("bundle contains a plugin-manifest file target");
+if (bundle.includes("main.js")) failures.push("bundle contains a hard-coded plugin-bundle file target");
 if (!bundle.trimEnd().endsWith("/* nosourcemap */")) failures.push("bundle is missing the Obsidian nosourcemap footer");
 const productionDependencies = Object.keys(packageJson.dependencies || {});
 if (productionDependencies.some((name) => /^(?:openai|@anthropic-ai\/)/i.test(name))

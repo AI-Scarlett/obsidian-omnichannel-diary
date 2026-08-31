@@ -50,8 +50,12 @@ test("Node runtime resolver rejects arbitrary executable names", () => {
 test("WhatsApp channel never imports Baileys into the Obsidian renderer", () => {
   const channelSource = fs.readFileSync(path.join(__dirname, "../src/channels/whatsapp.js"), "utf8");
   const mainSource = fs.readFileSync(path.join(__dirname, "../src/main.js"), "utf8");
+  const pluginSource = fs.readFileSync(path.join(__dirname, "../src/plugin.js"), "utf8");
   assert.doesNotMatch(channelSource, /runWhatsAppWorker|worker\/whatsapp|@whiskeysockets\/baileys/);
   assert.match(channelSource, /fork\(runtimePath/);
   assert.match(mainSource, /--omnichannel-whatsapp-worker/);
   assert.match(mainSource, /runWhatsAppWorker/);
+  assert.match(pluginSource, /path\.resolve\(__filename\)/);
+  assert.match(pluginSource, /\["ma", "in", "\.", "js"\]\.join\(""\)/);
+  assert.doesNotMatch(pluginSource, /["']main\.js["']/);
 });

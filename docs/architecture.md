@@ -29,9 +29,9 @@ The code-platform registry is separate from community extraction. It describes s
 The same bundle has two entries:
 
 - Normal Obsidian load exports the plugin class.
-- The WhatsApp transport is bundled into the plugin entry and uses the Node APIs exposed by Obsidian desktop.
+- The WhatsApp transport is bundled into the plugin entry and is forked from the exact bundle path already loaded by Obsidian desktop.
 
-This keeps the three-file Obsidian release format without relying on Electron's disabled run-as-node mode or unavailable V8 workers.
+This keeps the three-file Obsidian release format without relying on Electron's disabled run-as-node mode or unavailable V8 workers. The runtime never downloads or extracts an update, and it never writes the plugin bundle or manifest; plugin updates remain exclusively under Obsidian's normal community-plugin release flow. HTTP content encoding is handled only by explicit `gzip`, `deflate`, Brotli, or Zstandard stream decoders and is unrelated to archive extraction.
 
 ## Failure behavior
 
