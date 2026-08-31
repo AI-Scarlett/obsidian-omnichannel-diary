@@ -57,6 +57,7 @@ function formatCaptureReceipt(result, locale = "zh-CN") {
   const clipFailures = result.clipFailures?.length || 0;
   const codeLinkFailures = result.codeLinkFailures?.length || 0;
   const attachmentFailures = result.attachmentFailures?.length || 0;
+  const attachmentExtractionFailures = result.attachmentExtractionFailures?.length || 0;
   const savedAttachments = Number(result.savedAttachments) || 0;
   const diaryFallback = translate(locale, "日记", "Daily");
   const clippingFallback = translate(locale, "全渠道剪藏", "Clippings");
@@ -73,6 +74,20 @@ function formatCaptureReceipt(result, locale = "zh-CN") {
     const savedFiles = Math.max(0, Number(clip.savedFiles) || 0);
     const failedFiles = clip.fileFailures?.length || 0;
     const commentCount = Math.max(0, Number(clip.article?.commentCount) || 0);
+    const isPdf = clip.article?.extractionMethod === "pdf-text";
+    const pageCount = Math.max(0, Number(clip.article?.pageCount) || 0);
+    if (isPdf) {
+      if (locale === "en") {
+        const pages = pageCount ? `${pageCount}-page ` : "";
+        if (clip.article?.extractionStatus === "partial") lines.push(`⚠️ “${title}” was saved to “${clippingFolder}”, but only part of the ${pages}PDF text could be extracted.`);
+        else lines.push(`🔖 “${title}” was saved to “${clippingFolder}” with the extracted ${pages}PDF text.${savedFiles ? " The original PDF was also saved." : ""}`);
+      } else if (clip.article?.extractionStatus === "partial") {
+        lines.push(`⚠️ 《${title}》已保存到「${clippingFolder}」，但${pageCount ? ` ${pageCount} 页` : ""} PDF 正文提取不完整`);
+      } else {
+        lines.push(`🔖 《${title}》已提取${pageCount ? ` ${pageCount} 页` : ""} PDF 正文并保存到「${clippingFolder}」${savedFiles ? "，并保留原 PDF" : ""}`);
+      }
+      continue;
+    }
     const extractedEn = commentCount
       ? `the full text, ${commentCount} comment${commentCount === 1 ? "" : "s"}, and ${savedImages} image${savedImages === 1 ? "" : "s"}`
       : `the full text and ${savedImages} image${savedImages === 1 ? "" : "s"}`;
@@ -124,12 +139,14 @@ function formatCaptureReceipt(result, locale = "zh-CN") {
     if (clipFailures) lines.push(`⚠️ ${clipFailures} web page${clipFailures === 1 ? "" : "s"} could not be extracted. The original link${clipFailures === 1 ? " was" : "s were"} kept in today's note in “${diaryFolder}”.`);
     if (codeLinkFailures) lines.push(`⚠️ ${codeLinkFailures} code-platform link${codeLinkFailures === 1 ? "" : "s"} could not be filed. The original link${codeLinkFailures === 1 ? " was" : "s were"} kept in today's note in “${diaryFolder}”.`);
     if (attachmentFailures) lines.push(`⚠️ ${attachmentFailures} attachment${attachmentFailures === 1 ? "" : "s"} failed to save. The original message was kept in today's note in “${diaryFolder}”.`);
+    if (attachmentExtractionFailures) lines.push(`⚠️ Text could not be extracted from ${attachmentExtractionFailures} saved PDF attachment${attachmentExtractionFailures === 1 ? "" : "s"}. The original PDF${attachmentExtractionFailures === 1 ? " was" : "s were"} kept.`);
   } else {
     if (!clips.length && !codeLinks.length && !clipFailures && !codeLinkFailures) lines.push(`✍️ 已保存到今天的「${diaryFolder}」`);
     if (savedAttachments) lines.push(`📎 已保存 ${savedAttachments} 个附件到今天的「${diaryFolder}」`);
     if (clipFailures) lines.push(`⚠️ ${clipFailures} 个网页未能提取正文，原始链接已保存在今天的「${diaryFolder}」`);
     if (codeLinkFailures) lines.push(`⚠️ ${codeLinkFailures} 个代码平台地址未能分类保存，原始链接已保存在今天的「${diaryFolder}」`);
     if (attachmentFailures) lines.push(`⚠️ ${attachmentFailures} 个附件保存失败，原消息已保存在今天的「${diaryFolder}」`);
+    if (attachmentExtractionFailures) lines.push(`⚠️ ${attachmentExtractionFailures} 个 PDF 附件未能提取正文，原 PDF 已保存`);
   }
   return `${lines.join("\n")}\n\n${formatAgentGuide({ ...result, diaryFolder }, locale)}`;
 }

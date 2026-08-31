@@ -85,6 +85,54 @@ test("combined code-platform mode keeps the bookmark when extraction fails indep
   assert.match(writes[1].content, /链接提取失败/);
 });
 
+test("chat PDF attachments are saved once, extracted, and linked from the daily note", async () => {
+  const value = settings();
+  value.capture.downloadChatAttachments = true;
+  const writes = [];
+  let binaryWrites = 0;
+  const writer = {
+    saveBinary: async (folder, fileName) => {
+      binaryWrites += 1;
+      return `${folder}/${fileName}`;
+    },
+    upsertText: async (path, content) => { writes.push({ path, content }); return { path }; },
+    append: async (path, content) => { writes.push({ path, content }); return { path }; },
+  };
+  const diary = new DiaryService(writer, () => value, async () => {}, {
+    pdfExtractor: async (buffer, url) => ({
+      url,
+      title: "季度报告",
+      byline: "",
+      excerpt: "PDF text",
+      siteName: "PDF",
+      markdown: "## Page 1\n\nPDF text",
+      images: [],
+      contentChars: 120,
+      extractionMethod: "pdf-text",
+      extractionStatus: "complete",
+      binaryFiles: [{ buffer, fileName: "report.pdf", mimeType: "application/pdf" }],
+      pageCount: 1,
+    }),
+  });
+  const result = await diary.capture({
+    channel: "feishu",
+    channelName: "飞书 / Lark",
+    id: "pdf-message-1",
+    timestamp: new Date("2026-08-31T09:00:00Z"),
+    text: "",
+    attachments: [{ fileName: "report.pdf", mimeType: "application/pdf", load: async () => ({ fileName: "report.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF") }) }],
+  });
+  assert.equal(binaryWrites, 1);
+  assert.equal(result.savedAttachments, 1);
+  assert.equal(result.clips.length, 1);
+  assert.equal(result.attachmentExtractionFailures.length, 0);
+  assert.match(writes[0].path, /^剪藏\//);
+  assert.match(writes[0].content, /Original PDF/);
+  assert.match(writes[0].content, /PDF text/);
+  assert.match(writes[1].content, /PDF 剪藏：\[\[/);
+  assert.match(writes[1].content, /\[\[附件\/Chat\/2026-08-31\/feishu\/report\.pdf\]\]/);
+});
+
 test("WeChat advances its sync cursor only after every message succeeds", async () => {
   let saves = 0;
   const config = { token: "token", syncBuf: "old" };

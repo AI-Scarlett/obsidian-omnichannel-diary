@@ -1,7 +1,7 @@
 {
   "id": "omnichannel-diary",
   "name": "Omnichannel Diary",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "minAppVersion": "1.11.4",
   "description": "Save chats, documents, PDFs, and technical-community discussions into your local Vault. / 将聊天、文档、PDF 与技术社区讨论保存到本地 Vault.",
   "author": "AI-Scarlett",

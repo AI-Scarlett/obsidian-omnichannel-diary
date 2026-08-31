@@ -163,6 +163,20 @@ test("PDF receipts distinguish a saved original from an original-file failure", 
   assert.match(failed, /1 个原文件保存失败/);
 });
 
+test("chat PDF receipts report extracted pages and preserved attachments", () => {
+  const text = formatCaptureReceipt({
+    diaryPath: "日记/today.md",
+    diaryFolder: "日记",
+    clippingFolder: "全渠道剪藏",
+    clips: [{ article: { title: "季度报告", extractionStatus: "complete", extractionMethod: "pdf-text", pageCount: 12 }, savedImages: 0, savedFiles: 0, imageFailures: [], fileFailures: [] }],
+    savedAttachments: 1,
+    attachmentFailures: [],
+    attachmentExtractionFailures: [],
+  });
+  assert.match(text, /^🔖 《季度报告》已提取 12 页 PDF 正文并保存到「全渠道剪藏」/);
+  assert.match(text, /📎 已保存 1 个附件到今天的「日记」/);
+});
+
 test("code-platform bookmarks use the same bilingual receipt format", () => {
   const result = {
     diaryPath: "日记/today.md",

@@ -281,6 +281,10 @@ class WebClipper {
 
   async save(url, source = {}) {
     const article = await this.extract(url);
+    return this.saveArticle(article, source);
+  }
+
+  async saveArticle(article, source = {}) {
     const date = localDateParts(source.timestamp || new Date());
     const stem = safeFileName(article.title, new URL(article.url).hostname);
     const notePath = `${this.settings.storage.clippingFolder}/${date.day}-${stem}-${shortHash(article.url)}.md`;
