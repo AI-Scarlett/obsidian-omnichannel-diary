@@ -25,6 +25,22 @@ test("markdown conversion preserves headings, links, lists, and images", () => {
   assert.match(markdown, /!\[A\]\(<https:\/\/example.com\/a.png>\)/);
 });
 
+test("Feishu virtual document block types retain headings, lists, quotes, and dividers", () => {
+  const { document } = parseHTML(`<!doctype html><html><body>
+    <div data-block-type="heading2"><div>Section</div></div>
+    <div data-block-type="bullet"><div>Bullet item</div></div>
+    <div data-block-type="ordered"><div>2. Ordered item</div></div>
+    <div data-block-type="quote_container"><div>Quoted text</div></div>
+    <div data-block-type="divider"></div>
+  </body></html>`);
+  const markdown = cleanMarkdown(nodeToMarkdown(document.body));
+  assert.match(markdown, /^### Section$/m);
+  assert.match(markdown, /^- Bullet item$/m);
+  assert.match(markdown, /^1\. Ordered item$/m);
+  assert.match(markdown, /^> Quoted text$/m);
+  assert.match(markdown, /^---$/m);
+});
+
 test("web text cannot become Obsidian embeds, comments, HTML, or executable fenced blocks", () => {
   const { document } = parseHTML('<!doctype html><html><body><p>![[Private note]] [[Wiki]] %% hidden %% &lt;iframe src="bad"&gt;</p><p>```dataviewjs</p><p>dv.pages()</p></body></html>');
   const markdown = cleanMarkdown(nodeToMarkdown(document.body));

@@ -6,6 +6,15 @@ const DOCUMENT_SERVICES = {
     loginUrl: "https://www.feishu.cn/",
     hosts: ["feishu.cn", "larksuite.com", "larkoffice.com"],
     contentSelectors: ["[data-testid='doc-content']", ".docx-content", ".suite-page-canvas", "[contenteditable='true']", "main", "body"],
+    virtualDocument: {
+      scrollSelectors: [".bear-web-x-container", ".suite-page-canvas", ".docx-content"],
+      blockSelector: "[data-block-id]",
+      blockIdAttribute: "data-block-id",
+      blockTypeAttribute: "data-block-type",
+      pageBlockType: "page",
+      maxSteps: 2_400,
+      maxHtmlChars: 16 * 1024 * 1024,
+    },
   },
   tencent: {
     name: "Tencent Docs",

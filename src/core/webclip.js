@@ -138,6 +138,21 @@ function nodeToMarkdown(node, context = {}) {
   if (tag === "pre") return fencedCode(node.textContent || "");
   if (tag === "ul" || tag === "ol") return listToMarkdown(node, context);
   const content = [...node.childNodes].map((child) => nodeToMarkdown(child, context)).join("");
+  const blockType = String(node.getAttribute?.("data-block-type") || "").toLowerCase();
+  const feishuHeading = blockType.match(/^heading([1-6])$/);
+  if (feishuHeading) return `\n\n${"#".repeat(Number(feishuHeading[1]) + 1)} ${content.trim()}\n\n`;
+  if (blockType === "bullet") {
+    const body = content.trim().replace(/^[•·◦▪‣-]\s*/, "");
+    return body ? `\n- ${body}\n` : "";
+  }
+  if (blockType === "ordered") {
+    const body = content.trim().replace(/^\d+(?:\\[.)、]|[.)、])?\s*/, "");
+    return body ? `\n1. ${body}\n` : "";
+  }
+  if (blockType === "quote" || blockType === "quote_container") {
+    return `\n\n${content.trim().split("\n").map((line) => `> ${line}`).join("\n")}\n\n`;
+  }
+  if (blockType === "divider") return "\n\n---\n\n";
   if (tag === "br") return "\n";
   if (tag === "p" || tag === "div" || tag === "section" || tag === "article") return `\n\n${content.trim()}\n\n`;
   if (/^h[1-6]$/.test(tag)) return `\n\n${"#".repeat(Number(tag[1]) + 1)} ${content.trim()}\n\n`;
@@ -469,8 +484,11 @@ class WebClipper {
     let renderError;
     if (renderService && this.sessionManager) {
       try {
+        const captureTimeoutMs = Math.max(30_000, Math.min(60_000,
+          (Math.max(10, Number(this.settings.capture.webClipBudgetSeconds) || 75) * 1000) - 12_000));
         const rendered = await this.sessionManager.extract(url, renderService, {
           browserExecutable: this.settings.capture.browserExecutable,
+          captureTimeoutMs,
         });
         const article = articleFromHtml(rendered.html, rendered.url, {
           title: rendered.title,
@@ -484,7 +502,7 @@ class WebClipper {
         if (article.extractionStatus === "complete") return { ...article, commentCount: Number(rendered.commentCount) || 0 };
         renderError = new Error(`${COMMUNITY_SERVICES[renderService]?.name || renderService} rendered content was too short to save safely`);
       } catch (error) {
-        if (error?.code === "DOCUMENT_LOGIN_REQUIRED") throw error;
+        if (["DOCUMENT_LOGIN_REQUIRED", "DOCUMENT_CAPTURE_INCOMPLETE"].includes(error?.code)) throw error;
         renderError = error;
       }
     }

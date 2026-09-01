@@ -18,6 +18,11 @@ test("cloud documents and Product Hunt route to their rendered adapters", () => 
   assert.equal(communityServiceForUrl("https://juejin.cn/post/123"), "juejin");
   assert.ok(commentSelectorsForService("github").includes(".timeline-comment"));
   assert.match(renderedPayloadExpression("github"), /commentCount/);
+  const feishuExpression = renderedPayloadExpression("feishu");
+  assert.match(feishuExpression, /data-omnichannel-virtual-document/);
+  assert.match(feishuExpression, /virtualCapture/);
+  assert.match(feishuExpression, /scrollTop/);
+  assert.doesNotThrow(() => new Function(feishuExpression));
 });
 
 test("login pages are detected without treating normal private document text as login", () => {
@@ -55,6 +60,23 @@ test("WebClipper uses an injected persistent renderer for dynamic documents", as
   assert.equal(article.extractionStatus, "complete");
   assert.match(article.markdown, /项目方案/);
   assert.deepEqual(article.images, ["https://cdn.example.com/diagram.png"]);
+});
+
+test("WebClipper never falls back to a short static page after virtual document capture is incomplete", async () => {
+  const sessionManager = { extract: async () => {
+    const error = new Error("Feishu virtualized document capture did not reach the end");
+    error.code = "DOCUMENT_CAPTURE_INCOMPLETE";
+    throw error;
+  } };
+  const settings = {
+    storage: { clippingFolder: "Clips", attachmentFolder: "Assets" },
+    capture: { renderDynamicPages: true, browserExecutable: "", downloadWebImages: false, maxFileMb: 20 },
+  };
+  const clipper = new WebClipper({}, settings, { sessionManager });
+  await assert.rejects(
+    clipper.extract("https://example.feishu.cn/docx/example"),
+    (error) => error.code === "DOCUMENT_CAPTURE_INCOMPLETE",
+  );
 });
 
 test("render requests sharing one browser profile are serialized", async () => {

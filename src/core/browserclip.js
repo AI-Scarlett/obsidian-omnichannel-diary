@@ -193,50 +193,168 @@ function looksLikeBlockedPage(payload) {
   return text.length < 2_000 && /(?:403 forbidden|http error 403|access denied|request blocked|temporarily unavailable|页面访问受限|访问被拒绝)/i.test(`${title} ${text}`);
 }
 
-function renderedPayloadExpression(service) {
+function renderedPayloadExpression(service, options = {}) {
   const config = JSON.stringify({
     selectors: selectorsForService(service),
     commentSelectors: commentSelectorsForService(service),
     removeSelectors: RENDER_SERVICES[service]?.removeSelectors || ["script", "style", "noscript", "template"],
+    virtualDocument: RENDER_SERVICES[service]?.virtualDocument || null,
+    maxVirtualCaptureMs: Math.max(5_000, Math.min(45_000, Number(options.maxVirtualCaptureMs) || 45_000)),
   });
-  return `(() => {
+  return `(async () => {
     const config = ${config};
-    let root = document.body;
-    for (const selector of config.selectors) {
-      const candidate = document.querySelector(selector);
-      if (candidate && (candidate.innerText || '').trim().length > 60) { root = candidate; break; }
-    }
-    const container = document.createElement('main');
-    const content = root ? root.cloneNode(true) : document.body.cloneNode(true);
-    for (const selector of config.removeSelectors) {
-      try { for (const node of content.querySelectorAll(selector)) node.remove(); } catch (_) {}
-    }
-    container.appendChild(content);
-    let comments = [];
-    for (const selector of config.commentSelectors) {
+    const snapshot = () => {
+      let root = document.body;
+      for (const selector of config.selectors) {
+        const candidate = document.querySelector(selector);
+        if (candidate && (candidate.innerText || '').trim().length > 60) { root = candidate; break; }
+      }
+      const container = document.createElement('main');
+      const content = root ? root.cloneNode(true) : document.body.cloneNode(true);
+      for (const selector of config.removeSelectors) {
+        try { for (const node of content.querySelectorAll(selector)) node.remove(); } catch (_) {}
+      }
+      container.appendChild(content);
+      let comments = [];
+      for (const selector of config.commentSelectors) {
+        try {
+          const candidates = [...document.querySelectorAll(selector)].filter((node) => (node.innerText || '').trim().length > 1);
+          if (candidates.length) { comments = candidates; break; }
+        } catch (_) {}
+      }
+      const rootIncludesComments = comments.some((node) => root === node || root.contains(node));
+      if (comments.length && !rootIncludesComments) {
+        const section = document.createElement('section');
+        const heading = document.createElement('h2');
+        heading.textContent = 'Comments (' + comments.length + ')';
+        section.appendChild(heading);
+        for (const comment of comments.slice(0, 300)) section.appendChild(comment.cloneNode(true));
+        container.appendChild(section);
+      }
+      const title = (document.querySelector('meta[property="og:title"]') || {}).content || document.title || location.hostname;
+      const author = (document.querySelector('meta[name="author"]') || {}).content || '';
+      const description = (document.querySelector('meta[property="og:description"]') || document.querySelector('meta[name="description"]') || {}).content || '';
+      return { title, author, description, url: location.href, html: container.innerHTML, text: container.innerText, commentCount: comments.length };
+    };
+
+    const virtual = config.virtualDocument;
+    if (!virtual) return snapshot();
+    let scroller = null;
+    for (const selector of virtual.scrollSelectors || []) {
       try {
-        const candidates = [...document.querySelectorAll(selector)].filter((node) => (node.innerText || '').trim().length > 1);
-        if (candidates.length) { comments = candidates; break; }
+        const candidate = document.querySelector(selector);
+        if (candidate && candidate.clientHeight > 120 && candidate.scrollHeight > candidate.clientHeight + 200) {
+          scroller = candidate;
+          break;
+        }
       } catch (_) {}
     }
-    const rootIncludesComments = comments.some((node) => root === node || root.contains(node));
-    if (comments.length && !rootIncludesComments) {
-      const section = document.createElement('section');
-      const heading = document.createElement('h2');
-      heading.textContent = 'Comments (' + comments.length + ')';
-      section.appendChild(heading);
-      for (const comment of comments.slice(0, 300)) section.appendChild(comment.cloneNode(true));
-      container.appendChild(section);
+    if (!scroller) {
+      scroller = [...document.querySelectorAll('*')]
+        .filter((node) => node.clientHeight > 120 && node.scrollHeight > node.clientHeight + 200)
+        .sort((left, right) => (right.scrollHeight - right.clientHeight) - (left.scrollHeight - left.clientHeight))[0] || null;
     }
-    const title = (document.querySelector('meta[property="og:title"]') || {}).content || document.title || location.hostname;
-    const author = (document.querySelector('meta[name="author"]') || {}).content || '';
-    const description = (document.querySelector('meta[property="og:description"]') || document.querySelector('meta[name="description"]') || {}).content || '';
-    return { title, author, description, url: location.href, html: container.innerHTML, text: container.innerText, commentCount: comments.length };
+    if (!scroller) return snapshot();
+
+    const frame = () => new Promise((resolve) => {
+      let finished = false;
+      const done = () => { if (!finished) { finished = true; resolve(); } };
+      requestAnimationFrame(done);
+      setTimeout(done, 100);
+    });
+    const originalTop = scroller.scrollTop;
+    const blocks = new Map();
+    let order = 0;
+    let htmlChars = 0;
+    const capture = () => {
+      let added = 0;
+      let candidates = [];
+      try { candidates = [...scroller.querySelectorAll(virtual.blockSelector)]; } catch (_) {}
+      for (const block of candidates) {
+        const type = block.getAttribute(virtual.blockTypeAttribute) || '';
+        if (type === virtual.pageBlockType) continue;
+        const parent = block.parentElement?.closest(virtual.blockSelector);
+        if (!parent || parent.getAttribute(virtual.blockTypeAttribute) !== virtual.pageBlockType) continue;
+        const id = block.getAttribute(virtual.blockIdAttribute);
+        if (!id) continue;
+        const pageId = parent.getAttribute(virtual.blockIdAttribute) || 'page';
+        const key = pageId + ':' + id;
+        const clone = block.cloneNode(true);
+        for (const selector of [...config.removeSelectors, 'svg', '.docx-block-zero-space', '.fold-handler']) {
+          try { for (const node of clone.querySelectorAll(selector)) node.remove(); } catch (_) {}
+        }
+        const text = (clone.innerText || clone.textContent || '').trim();
+        const html = clone.outerHTML;
+        const previous = blocks.get(key);
+        if (!previous) {
+          blocks.set(key, { id: key, type, text, html, order: order++ });
+          htmlChars += html.length;
+          added += 1;
+        } else if (text.length > previous.text.length || html.length > previous.html.length) {
+          htmlChars += html.length - previous.html.length;
+          blocks.set(key, { id: key, type, text, html, order: previous.order });
+        }
+      }
+      return added;
+    };
+
+    const startedAt = performance.now();
+    const maxSteps = Math.max(1, Number(virtual.maxSteps) || 2400);
+    const maxHtmlChars = Math.max(1024 * 1024, Number(virtual.maxHtmlChars) || 16 * 1024 * 1024);
+    let steps = 0;
+    let endStable = 0;
+    let reachedEnd = false;
+    let timedOut = false;
+    scroller.scrollTop = 0;
+    await frame();
+    await frame();
+    capture();
+    while (steps < maxSteps) {
+      if (performance.now() - startedAt >= config.maxVirtualCaptureMs) { timedOut = true; break; }
+      const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      if (scroller.scrollTop >= maxTop - 1) {
+        await frame();
+        const added = capture();
+        const nextMax = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+        if (nextMax <= maxTop + 1 && added === 0) endStable += 1;
+        else endStable = 0;
+        if (endStable >= 2) { reachedEnd = true; break; }
+      } else {
+        const step = Math.max(480, Math.floor(scroller.clientHeight * 1.15));
+        scroller.scrollTop = Math.min(maxTop, scroller.scrollTop + step);
+        await frame();
+        capture();
+        endStable = 0;
+      }
+      steps += 1;
+    }
+    const capturedTop = scroller.scrollTop;
+    const capturedHeight = scroller.scrollHeight;
+    scroller.scrollTop = originalTop;
+
+    const items = [...blocks.values()].sort((left, right) => left.order - right.order);
+    if (!items.length) return snapshot();
+    const payload = snapshot();
+    payload.html = '<main data-omnichannel-virtual-document="true">' + items.map((item) => item.html).join('\\n') + '</main>';
+    payload.text = items.map((item) => item.text).filter(Boolean).join('\\n');
+    payload.virtualCapture = {
+      used: true,
+      complete: reachedEnd && !timedOut && htmlChars <= maxHtmlChars,
+      reachedEnd,
+      timedOut,
+      blockCount: items.length,
+      htmlChars,
+      textChars: payload.text.length,
+      steps,
+      capturedTop,
+      capturedHeight,
+    };
+    return payload;
   })()`;
 }
 
-async function runtimeValue(client, expression, awaitPromise = false) {
-  const result = await client.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise }, 30_000);
+async function runtimeValue(client, expression, awaitPromise = false, timeoutMs = 30_000) {
+  const result = await client.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise }, timeoutMs);
   if (result.exceptionDetails) throw new Error(result.exceptionDetails.text || "Page script failed");
   return result.result?.value;
 }
@@ -358,8 +476,25 @@ class WebSessionManager {
       await client.send("Page.navigate", { url }, 30_000);
       await loaded;
       await waitForStablePage(client, service, options.timeoutMs || 25_000);
-      const payload = await runtimeValue(client, renderedPayloadExpression(service));
+      const captureTimeoutMs = Math.max(30_000, Math.min(60_000, Number(options.captureTimeoutMs) || 55_000));
+      const payload = await runtimeValue(client, renderedPayloadExpression(service, {
+        maxVirtualCaptureMs: captureTimeoutMs - 5_000,
+      }), true, captureTimeoutMs);
       await validateResolvedHost(payload.url);
+      if (payload.virtualCapture?.used && !payload.virtualCapture.complete) {
+        const details = payload.virtualCapture;
+        const reason = details.timedOut ? "timed out before reaching the end"
+          : !details.reachedEnd ? "did not reach the end"
+            : "exceeded the safe rendered-document size limit";
+        const error = new Error(`${RENDER_SERVICES[service]?.name || service} virtualized document capture ${reason}`);
+        error.code = "DOCUMENT_CAPTURE_INCOMPLETE";
+        error.capture = {
+          blockCount: Number(details.blockCount) || 0,
+          textChars: Number(details.textChars) || 0,
+          steps: Number(details.steps) || 0,
+        };
+        throw error;
+      }
       if (looksLikeBlockedPage(payload)) {
         const error = new Error(`${RENDER_SERVICES[service]?.name || service} blocked automated page access`);
         error.code = "PAGE_ACCESS_BLOCKED";
