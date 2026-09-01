@@ -143,6 +143,14 @@ const COMMUNITY_SERVICES = {
     hosts: ["zhihu.com"], paths: [/\/(?:question\/\d+\/answer\/\d+|p\/\d+)/i], contentSelectors: [".Post-RichTextContainer", ".QuestionAnswer-content", "article", "main", "body"],
     commentSelectors: [".Comments-container", ".CommentItem"], authPattern: "登录知乎|扫码登录|sign in.*zhihu",
   },
+  xiaohongshu: {
+    name: "小红书 / REDnote", region: "china", api: "initial-state", session: true,
+    loginUrl: "https://www.xiaohongshu.com/", hosts: ["xiaohongshu.com", "xhslink.com", "xhslink.cn"],
+    paths: [/\/(?:explore|discovery\/item)\/[a-z0-9]+/i, /\/[a-z]\/[a-z0-9_-]+/i],
+    contentSelectors: ["#noteContainer", ".note-container", ".note-detail-mask", "main", "body"],
+    commentSelectors: [".comments-container .comment-item", ".comment-list .comment-item", "[class*='comment-item' i]"],
+    authPattern: "登录后查看|扫码登录|安全验证|verify you are human",
+  },
   sspai: {
     name: "少数派", region: "china", loginUrl: "https://sspai.com/",
     hosts: ["sspai.com"], paths: [/\/post\/\d+/i], contentSelectors: [".article-body", "article", "main", "body"], commentSelectors: [".comment-list", "[class*='comment' i]"],

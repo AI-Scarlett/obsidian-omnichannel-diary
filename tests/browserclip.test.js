@@ -12,6 +12,9 @@ test("cloud documents and Product Hunt route to their rendered adapters", () => 
   assert.equal(documentServiceForUrl("https://www.kdocs.cn/l/abc"), "wps");
   assert.equal(renderServiceForUrl("https://www.producthunt.com/posts/tool"), "producthunt");
   assert.equal(renderServiceForUrl("https://www.reddit.com/r/test/comments/abc/post"), "reddit");
+  assert.equal(renderServiceForUrl("https://www.xiaohongshu.com/explore/abc123"), "xiaohongshu");
+  assert.equal(renderServiceForUrl("https://xhslink.com/a/AbCd12"), "xiaohongshu");
+  assert.equal(renderServiceForUrl("https://xhslink.cn/o/2Mh8nwXF6Xx"), "xiaohongshu");
   assert.equal(isProductHuntUrl("https://producthunt.com/posts/tool"), true);
   assert.equal(isLikelyPdfUrl("https://example.com/report.pdf?download=1"), true);
   assert.ok(selectorsForService("feishu").includes(".docx-content"));

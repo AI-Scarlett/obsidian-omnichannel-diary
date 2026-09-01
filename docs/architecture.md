@@ -10,6 +10,7 @@ The plugin has four product layers:
 The web clipping layer routes known content before generic Readability extraction:
 
 - X posts/articles and WeChat articles use dedicated source-aware adapters;
+- Xiaohongshu/REDnote notes parse the server-supplied initial-state JSON without executing it, select the full-size image variant for each carousel item, and retain registered rendering as a fallback;
 - Reddit prefers the official JSON post/comment listing and falls back to an isolated browser session when public access is challenged;
 - Hacker News, GitHub issues/pull requests, Stack Exchange, DEV/Forem, Discourse, and V2EX use structured public post/comment adapters with rendered and generic HTML fallbacks;
 - direct PDFs use local text extraction and retain the original binary;

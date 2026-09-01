@@ -22,6 +22,7 @@ Additional self-hosted GitLab, Gitea, Forgejo, and internal code-platform hostna
 | --- | --- | --- |
 | X | Post/article text, author, quoted content, media | Generic page extraction |
 | WeChat articles | Official-article body, author, account, media | Generic page extraction |
+| Xiaohongshu / REDnote | Note text, author, publish time, full-size carousel images | Registered isolated rendering when initial-state data is unavailable |
 | Reddit | Post, external link/media, nested public comments | Isolated rendered page after an access challenge |
 | Hacker News | Story metadata, linked page, nested comments | Registered rendered page |
 | GitHub issues and pull requests | Body, issue comments, pull-review comments | Registered rendered page; Discussions always use rendering |
@@ -35,7 +36,7 @@ Additional self-hosted GitLab, Gitea, Forgejo, and internal code-platform hostna
 
 International: Product Hunt, GitHub Discussions, Medium, Hashnode, Substack, Lobsters, Indie Hackers, Hugging Face Discussions, and Kaggle Discussions.
 
-China: 掘金, CSDN, 博客园, SegmentFault 思否, 开源中国, 知乎, 少数派, InfoQ, 腾讯云开发者社区, 阿里云开发者社区, 51CTO, Gitee issues, and GitCode discussions/issues.
+China: 小红书/REDnote, 掘金, CSDN, 博客园, SegmentFault 思否, 开源中国, 知乎, 少数派, InfoQ, 腾讯云开发者社区, 阿里云开发者社区, 51CTO, Gitee issues, and GitCode discussions/issues.
 
 The registry stores matching hosts and detail-page paths separately from extraction logic. Adding a new site does not change the chat router or Vault writer.
 

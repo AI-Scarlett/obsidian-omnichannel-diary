@@ -9,6 +9,7 @@ const { extractPdf } = require("./pdfclip");
 const { extractRedditPost, parseRedditUrl } = require("./redditclip");
 const { COMMUNITY_SERVICES, communityServiceForUrl, documentServiceForUrl, isLikelyPdfUrl, renderServiceForUrl } = require("./web-platforms");
 const { extractXStatus } = require("./xclip");
+const { extractXiaohongshu, isXiaohongshuUrl } = require("./xhsclip");
 
 const WECHAT_NOISE_SELECTORS = [
   "#js_pc_qr_code", "#js_article_bottom_bar", "#js_bottom_ad_area", "#js_sponsor_ad_area",
@@ -458,6 +459,31 @@ class WebClipper {
   async extract(url) {
     const xStatus = await extractXStatus(url);
     if (xStatus) return xStatus;
+    let xiaohongshuError;
+    if (isXiaohongshuUrl(url)) {
+      try {
+        const data = await extractXiaohongshu(url);
+        if (data) {
+          const article = articleFromHtml(data.contentHtml, data.url || url, {
+            title: data.title,
+            byline: data.byline,
+            excerpt: data.excerpt,
+            siteName: data.siteName,
+            content: data.contentHtml,
+            plainText: data.plainText,
+            extractionMethod: data.extractionMethod,
+          });
+          return {
+            ...article,
+            canonicalUrl: data.canonicalUrl,
+            identityUrl: data.identityUrl,
+            images: data.images,
+            publishedAt: data.publishedAt,
+            extractionStatus: data.extractionStatus,
+          };
+        }
+      } catch (error) { xiaohongshuError = error; }
+    }
     let communityError;
     if (parseRedditUrl(url)) {
       try {
@@ -536,8 +562,8 @@ class WebClipper {
       }
     }
     const article = articleFromHtml(html, finalUrl);
-    if ((renderError || communityError) && article.extractionStatus === "partial") {
-      article.renderWarning = renderError?.message || communityError?.message || String(renderError || communityError);
+    if ((renderError || communityError || xiaohongshuError) && article.extractionStatus === "partial") {
+      article.renderWarning = renderError?.message || communityError?.message || xiaohongshuError?.message || String(renderError || communityError || xiaohongshuError);
     }
     return article;
   }

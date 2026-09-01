@@ -12,7 +12,7 @@ Omnichannel Diary 将聊天平台中的消息、网页和附件保存到本地 O
 - HTTP(S) 链接可转换为可读的 Markdown 笔记，保存到 `Omnichannel Diary/Clippings`。
 - 代码平台地址使用独立规则：提取网页、仅将地址分类收藏到 `Omnichannel Diary/Code Links/<平台>`，或者两者都做。“只分类收藏”模式不会访问目标网页。
 - 内置识别 GitHub、GitLab、Bitbucket、Azure DevOps、Codeberg、SourceHut、SourceForge、Launchpad、GNU Savannah、Hugging Face Hub、GitFlic、Google Git、Gitee、GitCode、极狐 GitLab、CODING、AtomGit 和 GitLink。也可以在设置中添加自建 GitLab、Gitea、Forgejo 或内部代码平台域名。
-- X 帖子/文章与微信公众号文章使用专用提取器。Reddit 公开接口可用时会保存帖子及嵌套评论；遇到访问限制时可使用隔离的登录浏览器会话。
+- X 帖子/文章与微信公众号文章使用专用提取器。小红书/REDnote 笔记会安全解析页面中不执行的初始状态数据，保存正文和全部高清轮播图片。Reddit 公开接口可用时会保存帖子及嵌套评论；遇到访问限制时可使用隔离的登录浏览器会话。
 - 技术社区详情页由可扩展注册表处理，不使用写死的单站路由。Hacker News、GitHub Issue/PR、Stack Exchange、DEV/Forem、Discourse 论坛和 V2EX 有结构化的帖子/评论适配器，并提供浏览器兜底。
 - 动态社区页面覆盖 Product Hunt、GitHub Discussions、Medium、Hashnode、Substack、Lobsters、Indie Hackers、Hugging Face、Kaggle、掘金、CSDN、博客园、SegmentFault、开源中国、知乎、少数派、InfoQ、腾讯云/阿里云开发者社区、51CTO、Gitee 和 GitCode。通用论坛检测还会保留未单独列出的 Discourse、Forem、Flarum、NodeBB 等页面中的可见评论。
 - 公开或私有的飞书/Lark 文档、腾讯文档和 WPS/KDocs 页面可通过隔离的本地浏览器渲染。插件不会读取用户日常浏览器中的 Cookie。
