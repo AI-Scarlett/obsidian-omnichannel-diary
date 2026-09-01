@@ -1,5 +1,7 @@
 # Omnichannel Diary
 
+**English** | [简体中文](README.zh-CN.md)
+
 Omnichannel Diary saves messages, web pages, and attachments from chat platforms into a local Obsidian Vault. It supports WeChat, Feishu/Lark, DingTalk, WeCom, QQ, Slack, Telegram, Discord, and WhatsApp.
 
 Version 0.4.x is an independent implementation. It does not contain source code from another Obsidian diary plugin and it has no AI provider, prompt, model, semantic routing, telemetry, account service, or hosted relay.

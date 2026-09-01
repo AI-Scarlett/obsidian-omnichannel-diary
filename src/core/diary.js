@@ -14,6 +14,36 @@ function attachmentSourceUrl(envelope, fileName) {
   return `attachment://${encodeURIComponent(envelope.channel || "chat")}/${encodeURIComponent(envelope.id || "message")}/${encodeURIComponent(fileName || "document.pdf")}`;
 }
 
+function normalizeDiaryMessage(value) {
+  return String(value || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\n[\t ]*\n+/g, "\n")
+    .split("\n")
+    .map((line) => /^(?:#{1,6}\s|---\s*$|_\()/.test(line) ? `\\${line}` : line)
+    .join("\n")
+    .trim();
+}
+
+function safeDiaryLabel(value, fallback) {
+  const compact = String(value || fallback || "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  return markdownEscape(compact || fallback || "");
+}
+
+async function mapCaptureTargets(targets, concurrency, worker) {
+  const results = new Array(targets.length);
+  let cursor = 0;
+  const run = async () => {
+    while (cursor < targets.length) {
+      const index = cursor;
+      cursor += 1;
+      try { results[index] = { value: await worker(targets[index], index) }; }
+      catch (error) { results[index] = { error }; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, run));
+  return results;
+}
+
 class DiaryService {
   constructor(writer, getSettings, onSettingsChanged, options = {}) {
     this.writer = writer;
@@ -144,6 +174,7 @@ class DiaryService {
     if (settings.capture.autoClipLinks) {
       const codeStore = new CodePlatformBookmarkStore(this.writer, settings);
       const codeMode = normalizeCodePlatformMode(settings.capture.codePlatformMode);
+      const clipTargets = [];
       for (const url of extractUrls(envelope.text).slice(0, 5)) {
         const codePlatform = classifyCodePlatformUrl(url, settings.capture.codePlatformAdditionalHosts);
         if (codePlatform && (codeMode === "bookmark" || codeMode === "both")) {
@@ -154,17 +185,24 @@ class DiaryService {
           }
         }
         if (!codePlatform || codeMode === "extract" || codeMode === "both") {
-          try {
-            clips.push(await getClipper().save(url, { channel: envelope.channel, timestamp: envelope.timestamp }));
-          } catch (error) {
-            clipFailures.push(`${url}: ${error?.message || error}`);
-          }
+          clipTargets.push(url);
         }
       }
+      const messageBudgetMs = Math.max(15, Number(settings.capture.webClipBudgetSeconds) || 75) * 1000;
+      const deadline = Date.now() + messageBudgetMs;
+      const results = await mapCaptureTargets(clipTargets, 2, (url) => getClipper().save(url, {
+        channel: envelope.channel,
+        timestamp: envelope.timestamp,
+        deadline,
+      }));
+      results.forEach((result, index) => {
+        if (result?.value) clips.push(result.value);
+        else if (result?.error) clipFailures.push(`${clipTargets[index]}: ${result.error?.message || result.error}`);
+      });
     }
 
-    const title = `${date.time} · ${envelope.channelName || envelope.channel} · ${envelope.senderName || "未知发送者"}`;
-    const lines = [`\n## ${title}\n`, String(envelope.text || "").trim() || "_无文字内容_", ""];
+    const title = `${date.time} · ${safeDiaryLabel(envelope.channelName || envelope.channel, "channel")} · ${safeDiaryLabel(envelope.senderName, "未知发送者")}`;
+    const lines = [`\n## ${title}\n`, normalizeDiaryMessage(envelope.text) || "_无文字内容_", ""];
     if (attachmentLines.length) lines.push(...attachmentLines, "");
     for (const clip of clips) {
       const pdfAttachment = String(clip.article?.url || "").startsWith("attachment:");
@@ -201,4 +239,4 @@ class DiaryService {
   }
 }
 
-module.exports = { DiaryService, attachmentSourceUrl, isPdfAttachment };
+module.exports = { DiaryService, attachmentSourceUrl, isPdfAttachment, mapCaptureTargets, normalizeDiaryMessage, safeDiaryLabel };

@@ -14,13 +14,19 @@ test("saved values are merged, folders normalized, and unknown inherited keys dr
   const settings = normalizeSettings({
     schemaVersion: 1,
     storage: { diaryFolder: "/Notes\\Diary/", codePlatformFolder: "/Dev\\Links/" },
-    capture: { maxFileMb: 500, codePlatformMode: "bookmark", codePlatformAdditionalHosts: "https://git.example.com/a, code.example.org" },
+    capture: {
+      maxFileMb: 500, maxWebImages: 999, maxWebImageTotalMb: 999, webClipBudgetSeconds: 2,
+      codePlatformMode: "bookmark", codePlatformAdditionalHosts: "https://git.example.com/a, code.example.org",
+    },
     channels: { telegram: { enabled: true, botToken: "secret" } },
     inheritedLegacyKey: "must disappear",
   });
   assert.equal(settings.storage.diaryFolder, "Notes/Diary");
   assert.equal(settings.storage.codePlatformFolder, "Dev/Links");
   assert.equal(settings.capture.maxFileMb, 100);
+  assert.equal(settings.capture.maxWebImages, 100);
+  assert.equal(settings.capture.maxWebImageTotalMb, 500);
+  assert.equal(settings.capture.webClipBudgetSeconds, 15);
   assert.equal(settings.capture.codePlatformMode, "bookmark");
   assert.equal(settings.capture.codePlatformAdditionalHosts, "git.example.com, code.example.org");
   assert.equal(settings.channels.telegram.botToken, "secret");
@@ -29,6 +35,13 @@ test("saved values are merged, folders normalized, and unknown inherited keys dr
   assert.equal(settings.ui.language, "auto");
   assert.equal(settings.capture.renderDynamicPages, true);
   assert.equal(settings.capture.browserExecutable, "");
+});
+
+test("new web clipping limits default to a bounded message budget", () => {
+  const settings = normalizeSettings({ schemaVersion: 1 });
+  assert.equal(settings.capture.maxWebImages, 30);
+  assert.equal(settings.capture.maxWebImageTotalMb, 50);
+  assert.equal(settings.capture.webClipBudgetSeconds, 75);
 });
 
 test("new code-platform settings keep existing installs on extraction mode", () => {

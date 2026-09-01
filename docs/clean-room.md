@@ -1,8 +1,8 @@
-# Clean-room record for 0.3.x
+# Independent implementation record for 0.4.x
 
 ## Boundary
 
-The 0.3.x implementation did not reuse earlier plugin source files, generated bundles, tests, UI styles, architecture documents, or implementation-specific names. The previous source entry points and separate WhatsApp worker were removed before the new source tree was written.
+The independent implementation did not reuse earlier plugin source files, generated bundles, tests, UI styles, architecture documents, or implementation-specific names. The previous source entry points and separate WhatsApp worker were removed before the new source tree was written.
 
 Product requirements retained at the boundary are facts and behavior: accept messages from nine named platforms, save text and links to Obsidian, preserve images and other attachments, support QR authorization where the public platform permits it, and ship through the Obsidian community directory.
 
@@ -12,7 +12,7 @@ Implementation work used public specifications and official SDK/API documentatio
 
 ## Independent artifacts
 
-The following were newly authored for 0.3.x:
+The following were newly authored for this project:
 
 - `src/` plugin, core, UI, channel, and worker modules;
 - unit tests under `tests/`;
@@ -20,4 +20,8 @@ The following were newly authored for 0.3.x:
 - settings interface and stylesheet;
 - README, architecture, setup, privacy, and this record.
 
-The public 0.3.x repository history begins with this independent tree, so the distribution is not represented as a fork or continuation of another plugin.
+The public repository history begins with this independent tree, so the distribution is not represented as a fork or continuation of another plugin.
+
+## Behavioral compatibility reviews
+
+Later maintenance may compare public bug reports and acceptance criteria from other projects to identify general failure classes. Those reviews do not import their implementation. The 0.4.x Markdown hardening, link identity, image-budget, message-boundary, bilingual documentation, and settings UI changes were implemented and tested inside this repository's own modular architecture; no external source file, test fixture, test body, or stylesheet was copied into the project.

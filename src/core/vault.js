@@ -44,6 +44,17 @@ class VaultWriter {
     return this.vault.create(normalized, content);
   }
 
+  findTextBySuffix(folderPath, suffix) {
+    const folder = normalizePath(folderPath || "");
+    const prefix = folder ? `${folder}/` : "";
+    const ending = String(suffix || "");
+    if (!ending) return "";
+    const files = typeof this.vault.getMarkdownFiles === "function"
+      ? this.vault.getMarkdownFiles()
+      : typeof this.vault.getFiles === "function" ? this.vault.getFiles() : [];
+    return files.find((file) => String(file.path || "").startsWith(prefix) && String(file.path || "").endsWith(ending))?.path || "";
+  }
+
   async append(filePath, content, initial = "") {
     const normalized = normalizePath(filePath);
     const previous = this.pending.get(normalized) || Promise.resolve();

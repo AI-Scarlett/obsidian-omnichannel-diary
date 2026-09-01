@@ -3,7 +3,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const http = require("node:http");
-const { isTrustedSyntheticDnsUrl, nodeRequest, parsePublicDnsAnswer, readLimitedBody, requestWithRetry, validateResolvedHost } = require("../src/core/network");
+const { USER_AGENT, isTrustedSyntheticDnsUrl, nodeRequest, parsePublicDnsAnswer, readLimitedBody, requestWithRetry, validateResolvedHost } = require("../src/core/network");
+
+test("web requests use a plain browser user agent without a plugin suffix", () => {
+  assert.match(USER_AGENT, /Chrome\/132\.0\.0\.0 Safari\/537\.36$/);
+  assert.doesNotMatch(USER_AGENT, /Omnichannel|Diary|Wechat/i);
+});
 
 test("node transport returns a fetch-like streaming response", async (t) => {
   const server = http.createServer((request, response) => {
@@ -48,6 +53,31 @@ test("transport retries transient TLS resets but does not repeat unsafe methods 
     throw Object.assign(new Error("socket disconnected"), { code: "ECONNRESET" });
   }), /socket disconnected/);
   assert.equal(postAttempts, 1);
+});
+
+test("callers can limit image retries to one connection reset", async () => {
+  let attempts = 0;
+  await assert.rejects(() => requestWithRetry("https://example.com/image", {
+    method: "GET",
+    requestAttempts: 2,
+    retryDelays: [0],
+    shouldRetry: (error) => error.code === "ECONNRESET",
+  }, async () => {
+    attempts += 1;
+    throw Object.assign(new Error("reset"), { code: "ECONNRESET" });
+  }), /reset/);
+  assert.equal(attempts, 2);
+
+  attempts = 0;
+  await assert.rejects(() => requestWithRetry("https://example.com/image", {
+    method: "GET",
+    requestAttempts: 2,
+    shouldRetry: (error) => error.code === "ECONNRESET",
+  }, async () => {
+    attempts += 1;
+    throw Object.assign(new Error("timeout"), { code: "ETIMEDOUT" });
+  }), /timeout/);
+  assert.equal(attempts, 1);
 });
 
 test("resolved private addresses stay blocked unless an exact caller predicate trusts the hostname", async () => {

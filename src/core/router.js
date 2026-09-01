@@ -76,6 +76,12 @@ function formatCaptureReceipt(result, locale = "zh-CN") {
     const commentCount = Math.max(0, Number(clip.article?.commentCount) || 0);
     const isPdf = clip.article?.extractionMethod === "pdf-text";
     const pageCount = Math.max(0, Number(clip.article?.pageCount) || 0);
+    if (clip.reused && !failedImages && !failedFiles) {
+      lines.push(locale === "en"
+        ? `🔖 “${title}” was already saved. Reused the clipping in “${clippingFolder}”.`
+        : `🔖 《${title}》之前已经保存，已复用「${clippingFolder}」中的剪藏`);
+      continue;
+    }
     if (isPdf) {
       if (locale === "en") {
         const pages = pageCount ? `${pageCount}-page ` : "";

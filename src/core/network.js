@@ -6,7 +6,7 @@ const https = require("node:https");
 const net = require("node:net");
 const { assertSafeRemoteUrl, isPrivateHost, mimeExtension, safeFileName } = require("./util");
 
-const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/132 Safari/537.36 OmnichannelDiary/0.4";
+const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36";
 const TRUSTED_SYNTHETIC_DNS_SUFFIXES = ["x.com", "twitter.com", "twimg.com", "weixin.qq.com", "qpic.cn", "qlogo.cn"];
 const PUBLIC_DNS_ENDPOINT = "https://cloudflare-dns.com/dns-query";
 const publicDnsCache = new Map();
@@ -152,7 +152,8 @@ async function requestWithRetry(input, options = {}, requester = nodeRequest) {
     try { return await requester(input, options); }
     catch (error) {
       lastError = error;
-      if (!isRetryableTransportError(error) || attempt === attempts - 1) throw error;
+      const retryable = typeof options.shouldRetry === "function" ? options.shouldRetry(error) : isRetryableTransportError(error);
+      if (!retryable || attempt === attempts - 1) throw error;
     }
   }
   throw lastError || new Error("Request failed");
@@ -177,6 +178,7 @@ async function safeFetch(input, options = {}) {
       timeoutMs: options.timeoutMs,
       requestAttempts: options.requestAttempts,
       retryDelays: options.retryDelays,
+      shouldRetry: options.shouldRetry,
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get("location");
@@ -200,11 +202,19 @@ async function downloadRemoteFile(url, options = {}) {
   if (options.referrer) headers.referer = options.referrer;
   let result;
   const retryable = new Set([429, 500, 502, 503, 504]);
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    result = await safeFetch(url, { headers, timeoutMs: options.timeoutMs, accept: options.accept || "image/avif,image/webp,image/*,*/*;q=0.8" });
+  const httpAttempts = Math.max(1, Number(options.httpAttempts) || 4);
+  for (let attempt = 0; attempt < httpAttempts; attempt += 1) {
+    result = await safeFetch(url, {
+      headers,
+      timeoutMs: options.timeoutMs,
+      requestAttempts: options.requestAttempts,
+      retryDelays: options.retryDelays,
+      shouldRetry: options.shouldRetry,
+      accept: options.accept || "image/avif,image/webp,image/*,*/*;q=0.8",
+    });
     if (result.response.ok) break;
     if (attempt === 0 && headers.referer) delete headers.referer;
-    if (!retryable.has(result.response.status) || attempt === 3) break;
+    if (!retryable.has(result.response.status) || attempt === httpAttempts - 1) break;
     try { await result.response.body?.cancel(); } catch (_) {}
     const retryAfter = Number(result.response.headers.get("retry-after") || 0);
     const waitMs = retryAfter > 0 ? Math.min(10_000, retryAfter * 1000) : 700 * (2 ** attempt);

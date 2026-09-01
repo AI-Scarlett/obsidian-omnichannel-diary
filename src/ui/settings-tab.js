@@ -7,6 +7,8 @@ const { codePlatformCoverage } = require("../core/code-platforms");
 const { COMMUNITY_SERVICES, DOCUMENT_SERVICES, communityCoverage } = require("../core/web-platforms");
 const { shortHash } = require("../core/util");
 
+const PROJECT_URL = "https://github.com/AI-Scarlett/obsidian-omnichannel-diary";
+
 const SECTIONS = [
   { id: "overview", zh: "概览", en: "Overview", icon: "layout-dashboard" },
   { id: "channels", zh: "渠道", en: "Channels", icon: "messages-square" },
@@ -290,6 +292,19 @@ class DiarySettingTab extends PluginSettingTab {
     local.createSpan({ cls: "od-metric-label", text: this.tr("日记目录", "Daily notes folder") });
     local.createEl("code", { text: this.plugin.settings.storage.diaryFolder });
 
+    const star = parent.createDiv({ cls: "od-star-card" });
+    const starIcon = star.createSpan({ cls: "od-star-icon" });
+    setIcon(starIcon, "star");
+    const starCopy = star.createDiv({ cls: "od-star-copy" });
+    starCopy.createEl("strong", { text: this.tr("喜欢这个插件？", "Enjoying this plugin?") });
+    starCopy.createEl("p", { text: this.tr(
+      "在 GitHub 上点个 Star，可以帮助更多 Obsidian 创作者发现它。",
+      "Star it on GitHub to help more Obsidian creators discover it.",
+    ) });
+    iconButton(star, this.tr("在 GitHub 上点 Star", "Star on GitHub"), "github", () => {
+      window.open(PROJECT_URL, "_blank", "noopener,noreferrer");
+    }, "od-star-button");
+
     const language = parent.createDiv({ cls: "od-panel" });
     language.createEl("h3", { text: this.tr("语言", "Language") });
     new Setting(language)
@@ -334,6 +349,7 @@ class DiarySettingTab extends PluginSettingTab {
       const state = item.createSpan({ cls: "od-state-dot" });
       this.statusElements.set(id, { dot: state });
     }
+
   }
 
   renderChannels(parent) {
@@ -461,6 +477,30 @@ class DiarySettingTab extends PluginSettingTab {
       input.inputEl.setAttr("type", "number"); input.inputEl.setAttr("min", "1"); input.inputEl.setAttr("max", "100");
       input.setValue(String(this.plugin.settings.capture.maxFileMb)).onChange(async (value) => {
         this.plugin.settings.capture.maxFileMb = Math.min(100, Math.max(1, Number(value) || 20)); await this.plugin.saveSettings();
+      });
+    });
+    new Setting(rules).setName(this.tr("每篇网页最多保存图片", "Maximum images per clipping")).setDesc(this.tr(
+      "默认 30 张；超出的图片保留远程地址，不阻塞后续消息。",
+      "Defaults to 30. Extra images keep their remote URLs and do not block later messages.",
+    )).addText((input) => {
+      input.inputEl.setAttr("type", "number"); input.inputEl.setAttr("min", "1"); input.inputEl.setAttr("max", "100");
+      input.setValue(String(this.plugin.settings.capture.maxWebImages)).onChange(async (value) => {
+        this.plugin.settings.capture.maxWebImages = Math.min(100, Math.max(1, Number(value) || 30)); await this.plugin.saveSettings();
+      });
+    });
+    new Setting(rules).setName(this.tr("每篇网页图片总量上限", "Total image budget per clipping")).setDesc("1–500 MB").addText((input) => {
+      input.inputEl.setAttr("type", "number"); input.inputEl.setAttr("min", "1"); input.inputEl.setAttr("max", "500");
+      input.setValue(String(this.plugin.settings.capture.maxWebImageTotalMb)).onChange(async (value) => {
+        this.plugin.settings.capture.maxWebImageTotalMb = Math.min(500, Math.max(1, Number(value) || 50)); await this.plugin.saveSettings();
+      });
+    });
+    new Setting(rules).setName(this.tr("单条消息网页处理预算", "Web-processing budget per message")).setDesc(this.tr(
+      "15–180 秒，默认 75 秒；到时后保存已完成的正文和图片，其余项目明确标记失败。",
+      "15–180 seconds, default 75. Completed text and images are kept; unfinished items are reported explicitly.",
+    )).addText((input) => {
+      input.inputEl.setAttr("type", "number"); input.inputEl.setAttr("min", "15"); input.inputEl.setAttr("max", "180");
+      input.setValue(String(this.plugin.settings.capture.webClipBudgetSeconds)).onChange(async (value) => {
+        this.plugin.settings.capture.webClipBudgetSeconds = Math.min(180, Math.max(15, Number(value) || 75)); await this.plugin.saveSettings();
       });
     });
     const codePlatforms = parent.createDiv({ cls: "od-panel" });

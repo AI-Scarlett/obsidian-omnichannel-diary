@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { DiaryService } = require("../src/core/diary");
+const { DiaryService, normalizeDiaryMessage } = require("../src/core/diary");
 const { WeChatChannel } = require("../src/channels/wechat");
 
 function settings() {
@@ -12,6 +12,12 @@ function settings() {
     runtime: { recentMessageIds: [], pendingReceipts: [] },
   };
 }
+
+test("daily message blocks normalize blank lines and protect structural prefixes", () => {
+  assert.equal(normalizeDiaryMessage("# title\r\n\r\n\r\nbody"), "\\# title\nbody");
+  assert.equal(normalizeDiaryMessage("---\nbody"), "\\---\nbody");
+  assert.equal(normalizeDiaryMessage("_(marker)_\nbody"), "\\_(marker)_\nbody");
+});
 
 test("a message is remembered only after its diary entry is written", async () => {
   const value = settings();
@@ -83,6 +89,41 @@ test("combined code-platform mode keeps the bookmark when extraction fails indep
   assert.match(result.clipFailures[0], /access challenged/);
   assert.match(writes[1].content, /代码平台收藏：\[\[/);
   assert.match(writes[1].content, /链接提取失败/);
+});
+
+test("multiple web links share one bounded capture window and one daily-note block", async () => {
+  const value = settings();
+  value.capture.autoClipLinks = true;
+  value.capture.webClipBudgetSeconds = 25;
+  const writes = [];
+  const deadlines = [];
+  const writer = {
+    append: async (path, content) => { writes.push({ path, content }); return { path }; },
+  };
+  const diary = new DiaryService(writer, () => value, async () => {}, {
+    webClipperFactory: () => ({
+      save: async (url, source) => {
+        deadlines.push(source.deadline);
+        return {
+          notePath: `剪藏/${url.endsWith("one") ? "one" : "two"}.md`,
+          article: { url, title: url.endsWith("one") ? "One" : "Two", extractionStatus: "complete" },
+          savedImages: 0,
+          imageFailures: [],
+          fileFailures: [],
+        };
+      },
+    }),
+  });
+  const original = "一起看 https://example.com/one 和 https://example.com/two";
+  const result = await diary.capture({
+    channel: "wechat", id: "multi-link", timestamp: new Date("2026-08-31T03:00:00Z"), text: original, attachments: [],
+  });
+  assert.equal(result.clips.length, 2);
+  assert.equal(new Set(deadlines).size, 1);
+  assert.equal(writes.length, 1);
+  assert.match(writes[0].content, new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(writes[0].content, /网页剪藏：\[\[剪藏\/one\]\]/);
+  assert.match(writes[0].content, /网页剪藏：\[\[剪藏\/two\]\]/);
 });
 
 test("chat PDF attachments are saved once, extracted, and linked from the daily note", async () => {

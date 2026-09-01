@@ -151,6 +151,23 @@ test("community receipts report captured comment threads in both languages", () 
   assert.match(formatCaptureReceipt({ diaryPath: "Daily/today.md", clips: [clip] }, "en"), /full text, 26 comments, and 3 images/);
 });
 
+test("reused clippings are reported consistently in Chinese and English", () => {
+  const result = {
+    diaryPath: "日记/2026-08-31.md",
+    clippingFolder: "全渠道剪藏",
+    clips: [{
+      reused: true,
+      notePath: "全渠道剪藏/reused.md",
+      savedImages: 0,
+      imageFailures: [],
+      fileFailures: [],
+      article: { title: "Existing page", extractionStatus: "complete" },
+    }],
+  };
+  assert.match(formatCaptureReceipt(result, "zh-CN"), /之前已经保存，已复用/);
+  assert.match(formatCaptureReceipt(result, "en"), /was already saved\. Reused/);
+});
+
 test("PDF receipts distinguish a saved original from an original-file failure", () => {
   const saved = formatCaptureReceipt({
     diaryPath: "日记/today.md", clips: [{ article: { title: "在线报告", extractionStatus: "complete" }, savedImages: 0, savedFiles: 1, imageFailures: [], fileFailures: [] }],

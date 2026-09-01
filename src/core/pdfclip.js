@@ -2,8 +2,20 @@
 
 let pdfJsPromise;
 
+function ensurePdfTextRuntime() {
+  if (typeof globalThis.DOMMatrix === "undefined") {
+    // PDF.js instantiates one DOMMatrix while loading its optional canvas
+    // renderer. Text extraction does not use that renderer, but Node runtimes
+    // without a native canvas binding still need the constructor to exist.
+    globalThis.DOMMatrix = class DOMMatrix {};
+  }
+}
+
 function loadPdfJs() {
-  if (!pdfJsPromise) pdfJsPromise = import("pdfjs-dist/legacy/build/pdf.mjs");
+  if (!pdfJsPromise) {
+    ensurePdfTextRuntime();
+    pdfJsPromise = import("pdfjs-dist/legacy/build/pdf.mjs");
+  }
   return pdfJsPromise;
 }
 
@@ -103,4 +115,4 @@ async function extractPdf(buffer, url, contentDisposition = "", options = {}) {
   };
 }
 
-module.exports = { decodePdfText, extractPdf, fileNameFromHeaders, loadPdfJs, pageText, parsePdfBuffer };
+module.exports = { decodePdfText, ensurePdfTextRuntime, extractPdf, fileNameFromHeaders, loadPdfJs, pageText, parsePdfBuffer };

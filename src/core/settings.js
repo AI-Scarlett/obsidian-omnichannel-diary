@@ -58,6 +58,9 @@ const DEFAULT_SETTINGS = {
     browserExecutable: "",
     downloadChatAttachments: true,
     maxFileMb: 20,
+    maxWebImages: 30,
+    maxWebImageTotalMb: 50,
+    webClipBudgetSeconds: 75,
     includeGroupMessages: true,
     requireMentionInGroups: false,
   },
@@ -100,6 +103,9 @@ function normalizeSettings(saved) {
   value.capture.codePlatformMode = normalizeCodePlatformMode(value.capture.codePlatformMode);
   value.capture.codePlatformAdditionalHosts = normalizeAdditionalHosts(value.capture.codePlatformAdditionalHosts).join(", ");
   value.capture.maxFileMb = Math.min(100, Math.max(1, Number(value.capture.maxFileMb) || 20));
+  value.capture.maxWebImages = Math.min(100, Math.max(1, Number(value.capture.maxWebImages) || 30));
+  value.capture.maxWebImageTotalMb = Math.min(500, Math.max(1, Number(value.capture.maxWebImageTotalMb) || 50));
+  value.capture.webClipBudgetSeconds = Math.min(180, Math.max(15, Number(value.capture.webClipBudgetSeconds) || 75));
   value.capture.browserExecutable = String(value.capture.browserExecutable || "").trim();
   value.ui.language = normalizeLanguagePreference(value.ui.language);
   value.runtime.recentMessageIds = Array.isArray(value.runtime.recentMessageIds) ? value.runtime.recentMessageIds.slice(-500) : [];
@@ -137,6 +143,9 @@ function migrateLegacySettings(saved) {
       browserExecutable: "",
       downloadChatAttachments: legacySettings.saveVoiceAudio !== false,
       maxFileMb: Number(legacySettings.webClipMaxTotalImageMb) || DEFAULT_SETTINGS.capture.maxFileMb,
+      maxWebImages: Number(legacySettings.webClipMaxImages) || DEFAULT_SETTINGS.capture.maxWebImages,
+      maxWebImageTotalMb: Number(legacySettings.webClipMaxTotalImageMb) || DEFAULT_SETTINGS.capture.maxWebImageTotalMb,
+      webClipBudgetSeconds: DEFAULT_SETTINGS.capture.webClipBudgetSeconds,
       includeGroupMessages: true,
       requireMentionInGroups: false,
     },

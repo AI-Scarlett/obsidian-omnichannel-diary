@@ -64,6 +64,14 @@
 .od-mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
 .od-mini-channel { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 9px 11px; border-radius: 10px; background: var(--background-primary); font-size: 13px; }
 .od-mini-mark { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: color-mix(in srgb, var(--od-channel) 14%, transparent); color: var(--od-channel); font-weight: 800; }
+.od-star-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; margin: 0 0 16px; padding: 20px 22px; overflow: hidden; border: 1px solid color-mix(in srgb, #d99a00 24%, var(--od-border)); border-radius: 18px; background: radial-gradient(circle at 0 50%, color-mix(in srgb, #ffc94b 20%, transparent), transparent 34%), linear-gradient(90deg, color-mix(in srgb, #fff4d3 48%, var(--background-primary)), var(--od-surface)); }
+.od-star-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: color-mix(in srgb, #ffc94b 16%, var(--background-primary)); color: #b97600; }
+.od-star-icon svg { width: 25px; height: 25px; }
+.od-star-copy { min-width: 0; }
+.od-star-copy strong { display: block; margin-bottom: 5px; font-size: 16px; }
+.od-star-copy p { margin: 0; color: var(--text-muted); line-height: 1.55; }
+.od-button.od-star-button { min-height: 42px; padding-inline: 18px; border-color: color-mix(in srgb, var(--text-normal) 18%, var(--od-border)); border-radius: 999px; background: color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary)); white-space: nowrap; }
+.od-button.od-star-button:hover { border-color: #d99a00; background: color-mix(in srgb, #ffc94b 12%, var(--background-primary)); }
 .od-state-dot { width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: var(--text-faint); }
 .od-state-dot[data-state="connected"] { background: #22b573; box-shadow: 0 0 0 3px color-mix(in srgb, #22b573 16%, transparent); }
 .od-state-dot[data-state="connecting"], .od-state-dot[data-state="pairing"] { background: #e5a321; }
@@ -126,6 +134,8 @@
   .od-metric-wide { grid-column: 1 / -1; }
   .od-step-list, .od-mini-grid { grid-template-columns: 1fr; }
   .od-support-grid { grid-template-columns: 1fr; }
+  .od-star-card { grid-template-columns: auto minmax(0, 1fr); }
+  .od-star-card .od-star-button { grid-column: 1 / -1; justify-self: stretch; }
 }
 @media (max-width: 560px) {
   .omnichannel-diary-settings { padding-top: 12px; }
