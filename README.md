@@ -29,6 +29,18 @@ All folders and capture rules are configurable.
 
 Optional remote search is off by default. When enabled, any connected channel can send `search keyword` or `查 关键词` — a space after the command is required, otherwise the message is saved as diary text. The plugin returns title, time, source, and path only. After `confirm 1,3` or `确认 1,3`, it packs those notes on this computer as Markdown, plain text, Word, or PDF and tries to send an openable file back through that channel. See [Remote search and export](docs/remote-search.md).
 
+![WhatsApp: search notes](docs/images/remote-search-whatsapp-query.png)
+
+`查 GEO` — keep a space after `查`. The bot replies immediately, then lists title, time, source, and path.
+
+![WhatsApp: confirm and receive a file](docs/images/remote-search-whatsapp-export.png)
+
+`确认 1` packs the selected note on this computer and sends an openable attachment back on WhatsApp.
+
+![Feishu/Lark: confirm and receive a file](docs/images/remote-search-feishu-export.png)
+
+The same confirmation on Feishu/Lark also returns an openable file through that channel.
+
 See [Supported clipping sources](docs/supported-sources.md) for the extraction method and limitations of each source family.
 
 ## Channel support

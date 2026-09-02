@@ -29,6 +29,18 @@ Omnichannel Diary 将聊天平台中的消息、网页和附件保存到本地 O
 
 可选的远程查询默认关闭。开启后，任意已连接渠道都可以发送「查 关键词」（查 和关键词之间必须有空格；「查手机卡」会记进日记），也可用「search keyword」。插件只返回标题、时间、来源和路径；回复「确认 1,3」或「confirm 1,3」后，再按电脑端默认格式打包成 Markdown、纯文本、Word 或 PDF，并尝试把可打开的附件发回当前渠道。详见[远程查询与导出](docs/remote-search.md)。
 
+![WhatsApp 远程查询](docs/images/remote-search-whatsapp-query.png)
+
+发「查 GEO」——「查」和关键词之间必须有空格。机器人会先回「正在查询，请稍等！」，再返回标题、时间、来源和路径。
+
+![WhatsApp 确认后发回附件](docs/images/remote-search-whatsapp-export.png)
+
+回复「确认 1」后，插件在电脑上打包，并把可打开的附件发回 WhatsApp。
+
+![飞书确认后发回附件](docs/images/remote-search-feishu-export.png)
+
+飞书/Lark 用同样的确认命令，也会发回可打开的文件。
+
 各类来源的提取方式和限制请参阅[支持的剪藏来源](docs/supported-sources.md)。
 
 ## 渠道支持

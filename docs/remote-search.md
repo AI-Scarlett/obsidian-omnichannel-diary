@@ -4,6 +4,22 @@ Remote search lets a connected chat bot query Markdown notes in the current desk
 
 This feature is desktop-only. Obsidian must stay open. It is off by default.
 
+## Screenshots
+
+The same query/confirm flow works on any connected channel. These examples are WhatsApp and Feishu/Lark.
+
+![WhatsApp: search notes](images/remote-search-whatsapp-query.png)
+
+`查 GEO` — keep a space after `查`. The bot replies immediately, then lists title, time, source, and path.
+
+![WhatsApp: confirm and receive a file](images/remote-search-whatsapp-export.png)
+
+`确认 1` packs the selected note on this computer and sends an openable attachment back on WhatsApp.
+
+![Feishu/Lark: confirm and receive a file](images/remote-search-feishu-export.png)
+
+The same confirmation on Feishu/Lark also returns an openable file through that channel.
+
 ## What is shared
 
 Search, candidate confirmation, and packing are one core:
