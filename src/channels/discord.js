@@ -3,6 +3,7 @@
 const WebSocket = require("ws");
 const { BaseChannel } = require("./base");
 const { readLimitedBody, safeFetch } = require("../core/network");
+const { encodeMultipart, exportMimeType } = require("../core/util");
 
 class DiscordChannel extends BaseChannel {
   constructor(config, context) {
@@ -12,6 +13,27 @@ class DiscordChannel extends BaseChannel {
     this.sequence = null;
     this.botId = "";
     this.reconnectTimer = null;
+  }
+
+  async sendFile(channelId, messageId, file) {
+    const payload = JSON.stringify({
+      message_reference: { message_id: messageId },
+      allowed_mentions: { replied_user: false },
+    });
+    const multipart = encodeMultipart(
+      { payload_json: payload },
+      [{ field: "files[0]", fileName: file?.name || "export.bin", mimeType: exportMimeType(file?.format, file?.name), buffer: file?.buffer }],
+    );
+    const { response } = await safeFetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: "POST",
+      headers: { authorization: `Bot ${this.config.botToken}`, "content-type": multipart.contentType },
+      body: multipart.body,
+      accept: "application/json",
+      timeoutMs: 60_000,
+    });
+    const body = (await readLimitedBody(response, 4 * 1024 * 1024)).toString("utf8");
+    if (!response.ok) throw new Error(`Discord HTTP ${response.status}: ${body.slice(0, 160)}`);
+    return body ? JSON.parse(body) : {};
   }
 
   async rest(path, options = {}) {
@@ -82,6 +104,7 @@ class DiscordChannel extends BaseChannel {
       reply: async (text) => this.rest(`/channels/${message.channel_id}/messages`, {
         method: "POST", body: { content: text, message_reference: { message_id: message.id }, allowed_mentions: { replied_user: false } },
       }),
+      replyFile: async (file) => this.sendFile(message.channel_id, message.id, file),
     });
   }
 

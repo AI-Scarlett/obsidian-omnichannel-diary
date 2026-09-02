@@ -16,3 +16,5 @@
 - **Discord:** create an application/bot, enable Message Content intent, invite the bot to the desired server, and paste the bot token.
 
 These platforms control permissions and rate limits. A green status confirms transport connection; it does not override missing event subscriptions or media scopes in the platform console.
+
+Enabling a channel does not install an SDK, npm package, or extra plugin. Channel transports are already bundled. Remote search, packing, and per-channel file sending are also bundled. WhatsApp may still require a local Node.js 20.18+ executable because it runs in an isolated process; that requirement is unrelated to export.

@@ -2,6 +2,16 @@
 
 const { translate } = require("./i18n");
 const { extractUrls } = require("./util");
+const { getChannelMeta } = require("./settings");
+const {
+  formatRemoteAckText,
+  formatRemoteCancelText,
+  formatRemoteDisabledText,
+  formatRemoteExportReceipt,
+  formatRemoteHelpText,
+  parseRemoteCommand,
+  stripRemoteCommandNoise,
+} = require("./remote-search");
 
 function displayFolder(value, fallback) {
   return String(value || fallback).replace(/^\/+|\/+$/g, "").trim() || fallback;
@@ -19,15 +29,9 @@ function displayTitle(value, locale = "zh-CN") {
 }
 
 function formatAgentGuide(result = {}, locale = "zh-CN") {
-  const diaryFallback = translate(locale, "日记", "Daily");
-  const diaryFolder = displayFolder(result.diaryFolder || folderFromPath(result.diaryPath, diaryFallback), diaryFallback);
-  return locale === "en" ? [
-    "Hi! I'm your quick-capture Agent ✍️",
-    `Send me any text, voice note, image, or file and I'll add it to today's note. Send a web link and I'll extract supported articles, cloud documents, PDFs, technical-community posts, answers, and comment threads into a Markdown clipping with an entry in today's note. Code-platform links follow your selected rule: extract, file as a categorized bookmark, or both. Your notes are stored in the “${diaryFolder}” folder. To change it, open Obsidian Settings → Community plugins → Omnichannel Diary → Storage & privacy → Daily notes. If something needs correcting, edit it directly in Obsidian. Send “help” anytime to see all commands.`,
-  ].join("\n") : [
-    "嗨~ 我是你的随手记 Agent ✍️",
-    `想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取支持的文章、云文档、PDF，以及国内外技术社区的帖子、问答和评论串，存成 Markdown 剪藏，并在今天的笔记里留入口。代码平台地址会按你的设置提取、分类收藏，或两者都做。记的东西在 Obsidian 的「${diaryFolder}」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。`,
-  ].join("\n");
+  return locale === "en"
+    ? "Hi~ I'm your quick-capture Agent ✍️ Send me anything you want to save. If something is wrong, edit it in Obsidian. Send “help” anytime for all commands."
+    : "嗨~ 我是你的随手记 Agent ✍️ 想记什么直接发给我，说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。";
 }
 
 function formatHelpText(locale = "zh-CN", result = {}) {
@@ -38,6 +42,11 @@ function formatHelpText(locale = "zh-CN", result = {}) {
     "• Send a code-platform link: extract it, file it as a categorized bookmark, or do both according to Capture rules",
     "• /clip <URL>: clip only the specified page",
     "• /status: show the current channel connection status",
+    "• Remote search needs a space: search keyword. Without the space it is saved as diary text.",
+    ...(result.remoteSearchEnabled ? [
+      "",
+      formatRemoteHelpText({ remoteSearch: { exportFormat: result.remoteExportFormat || "md" } }, "en"),
+    ] : []),
   ] : [
     "可用指令：",
     "• 直接发送文字、语音、图片或文件：写入今天的笔记",
@@ -45,6 +54,11 @@ function formatHelpText(locale = "zh-CN", result = {}) {
     "• 发送代码平台地址：按收集规则提取正文、分类收藏地址，或两者都做",
     "• /clip <链接>：只剪藏指定网页",
     "• /status：查看当前渠道连接状态",
+    "• 远程查询必须加空格：查 关键词。写成「查手机卡」会当作普通日记记录。",
+    ...(result.remoteSearchEnabled ? [
+      "",
+      formatRemoteHelpText({ remoteSearch: { exportFormat: result.remoteExportFormat || "md" } }, "zh-CN"),
+    ] : []),
   ];
   return [formatAgentGuide(result, locale), "", ...commands].join("\n");
 }
@@ -178,6 +192,8 @@ class CaptureRouter {
     this.replyRetryDelays = options.replyRetryDelays || [0, 700, 2_000];
     this.getLocale = options.getLocale || (() => "zh-CN");
     this.getStorage = options.getStorage || (() => ({}));
+    this.getRemoteSearch = options.getRemoteSearch || (() => ({ enabled: false, exportFormat: "md" }));
+    this.remoteSearch = options.remoteSearch || null;
   }
 
   async reply(envelope, text) {
@@ -185,14 +201,89 @@ class CaptureRouter {
     await sendReplyWithRetry(envelope.reply, text, this.replyRetryDelays);
   }
 
+  async sendFile(envelope, file) {
+    if (!file?.buffer) return { status: "unsupported" };
+    if (typeof envelope.replyFile !== "function") return { status: "unsupported" };
+    try {
+      await envelope.replyFile(file);
+      return { status: "sent" };
+    } catch (error) {
+      return { status: "failed", error: error?.message || String(error) };
+    }
+  }
+
+  helpContext() {
+    const storage = this.getStorage() || {};
+    const remote = this.getRemoteSearch() || {};
+    return {
+      diaryFolder: storage.diaryFolder,
+      remoteSearchEnabled: remote.enabled === true,
+      remoteExportFormat: remote.exportFormat || "md",
+    };
+  }
+
+  async handleRemoteCommand(envelope, command, locale) {
+    if (this.getRemoteSearch()?.enabled !== true) {
+      await this.reply(envelope, formatRemoteDisabledText(locale));
+      return { command: `remote-${command.type}`, ignored: "remote-disabled" };
+    }
+    if (command.type === "help") {
+      await this.reply(envelope, formatRemoteHelpText({ remoteSearch: this.getRemoteSearch() }, locale));
+      return { command: "remote-help" };
+    }
+    if (!this.remoteSearch) {
+      await this.reply(envelope, translate(locale, "远程查询服务尚未就绪。", "Remote search is not ready."));
+      return { command: `remote-${command.type}`, error: "unavailable" };
+    }
+    const owner = { channel: envelope.channel, senderId: envelope.senderId };
+    if (command.type === "cancel") {
+      this.remoteSearch.clearOwner(owner.channel, owner.senderId);
+      await this.remoteSearch.persist();
+      await this.reply(envelope, formatRemoteCancelText(locale));
+      return { command: "remote-cancel" };
+    }
+    if (command.type === "search") {
+      try {
+        await this.reply(envelope, formatRemoteAckText("search", locale));
+        const result = await this.remoteSearch.search(command.keyword, owner);
+        await this.reply(envelope, locale === "en" ? result.replyEn : result.replyZh);
+        return { command: "remote-search", session: result.session };
+      } catch (error) {
+        await this.reply(envelope, translate(locale, "查询失败：{error}", "Search failed: {error}", { error: error?.message || error }));
+        return { command: "remote-search", error: error?.message || String(error) };
+      }
+    }
+    if (command.type === "export") {
+      if (!command.indexes) {
+        await this.reply(envelope, translate(locale, "请回复编号，例如：确认 1,3", "Reply with numbers, for example: confirm 1,3"));
+        return { command: "remote-export", error: "missing-indexes" };
+      }
+      try {
+        await this.reply(envelope, formatRemoteAckText("export", locale));
+        const file = await this.remoteSearch.createExport(command.queryId, command.indexes, owner);
+        const delivery = await this.sendFile(envelope, file);
+        const channelName = getChannelMeta(envelope.channel, locale).name || envelope.channel || translate(locale, "该渠道", "this channel");
+        await this.reply(envelope, formatRemoteExportReceipt(file, channelName, locale, delivery.status, delivery.error));
+        return { command: "remote-export", file, delivery };
+      } catch (error) {
+        await this.reply(envelope, translate(locale, "导出失败：{error}", "Export failed: {error}", { error: error?.message || error }));
+        return { command: "remote-export", error: error?.message || String(error) };
+      }
+    }
+    return { command: "remote-unknown" };
+  }
+
   async handle(envelope) {
-    const text = String(envelope.text || "").trim();
-    const locale = this.getLocale();
-    if (text === "/help" || text.toLowerCase() === "help" || text === "帮助") {
-      const storage = this.getStorage() || {};
-      await this.reply(envelope, formatHelpText(locale, { diaryFolder: storage.diaryFolder }));
+    const text = stripRemoteCommandNoise(envelope.text);
+    const appLocale = this.getLocale();
+    if (text === "/help" || text.toLowerCase() === "help" || text === "帮助" || text === "幫助") {
+      const locale = text.toLowerCase() === "help" ? "en" : (text === "幫助" || text === "帮助" ? "zh-CN" : appLocale);
+      await this.reply(envelope, formatHelpText(locale, this.helpContext()));
       return { command: "help" };
     }
+    const remoteCommand = parseRemoteCommand(text);
+    if (remoteCommand) return this.handleRemoteCommand(envelope, remoteCommand, remoteCommand.locale || appLocale);
+    const locale = appLocale;
     if (text === "/status") {
       const status = this.getStatus();
       const connected = Object.values(status).filter((item) => item.state === "connected").length;

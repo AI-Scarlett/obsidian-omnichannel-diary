@@ -50,6 +50,10 @@ class WeComChannel extends BaseChannel {
       text,
       attachments,
       reply: async (replyText) => this.client.replyStream(frame, `diary-${message.msgid}`, replyText, true),
+      replyFile: async (file) => {
+        const uploaded = await this.client.uploadMedia(file.buffer, { type: "file", filename: file.name || "export.bin" });
+        await this.client.replyMedia(frame, "file", uploaded.media_id);
+      },
     };
   }
 

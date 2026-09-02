@@ -32,6 +32,9 @@ test("saved values are merged, folders normalized, and unknown inherited keys dr
   assert.equal(settings.channels.telegram.botToken, "secret");
   assert.equal(settings.inheritedLegacyKey, undefined);
   assert.deepEqual(settings.runtime.pendingReceipts, []);
+  assert.deepEqual(settings.runtime.remoteQueries, []);
+  assert.equal(settings.remoteSearch.enabled, false);
+  assert.equal(settings.remoteSearch.exportFormat, "md");
   assert.equal(settings.ui.language, "auto");
   assert.equal(settings.capture.renderDynamicPages, true);
   assert.equal(settings.capture.browserExecutable, "");
@@ -56,6 +59,23 @@ test("language choice is preserved and invalid values fall back to Obsidian auto
   assert.equal(normalizeSettings({ schemaVersion: 1, ui: { language: "en" } }).ui.language, "en");
   assert.equal(normalizeSettings({ schemaVersion: 1, ui: { language: "zh-cn" } }).ui.language, "zh-CN");
   assert.equal(normalizeSettings({ schemaVersion: 1, ui: { language: "de" } }).ui.language, "auto");
+});
+
+test("remote search settings stay off by default and drop expired sessions", () => {
+  const settings = normalizeSettings({
+    schemaVersion: 1,
+    remoteSearch: { enabled: "yes", folder: "/Notes\\Research/", exportFormat: "pdfx" },
+    runtime: { remoteQueries: [
+      { id: "Q0902-AAAA", ownerKey: "wechat:u1", keyword: "ai", expiresAt: Date.now() + 60_000, candidates: [{ path: "a.md", title: "A", time: "t", source: "s", mtime: 1, content: "secret" }] },
+      { id: "Q0902-BBBB", ownerKey: "wechat:u1", keyword: "old", expiresAt: Date.now() - 1, candidates: [{ path: "b.md" }] },
+    ] },
+  });
+  assert.equal(settings.remoteSearch.enabled, false);
+  assert.equal(settings.remoteSearch.folder, "Notes/Research");
+  assert.equal(settings.remoteSearch.exportFormat, "md");
+  assert.equal(settings.runtime.remoteQueries.length, 1);
+  assert.equal(settings.runtime.remoteQueries[0].id, "Q0902-AAAA");
+  assert.equal(settings.runtime.remoteQueries[0].candidates[0].content, undefined);
 });
 
 test("pending receipts are sanitized and bounded for retry after restart", () => {

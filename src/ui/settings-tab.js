@@ -3,6 +3,7 @@
 const QRCode = require("qrcode");
 const { Modal, Notice, PluginSettingTab, Setting, setIcon } = require("obsidian");
 const { CHANNEL_IDS, clearChannelCredentials, getChannelMeta } = require("../core/settings");
+const { REMOTE_EXPORT_FORMATS, remoteExportFormat } = require("../core/remote-search");
 const { codePlatformCoverage } = require("../core/code-platforms");
 const { COMMUNITY_SERVICES, DOCUMENT_SERVICES, communityCoverage } = require("../core/web-platforms");
 const { shortHash } = require("../core/util");
@@ -473,6 +474,54 @@ class DiarySettingTab extends PluginSettingTab {
     this.addToggle(rules, this.tr("保存聊天附件", "Save chat attachments"), this.tr("图片、文件、音频和视频按渠道保存", "Store images, files, audio, and video by channel"), "downloadChatAttachments");
     this.addToggle(rules, this.tr("收集群聊消息", "Capture group messages"), this.tr("关闭后只保存私聊", "When disabled, only direct messages are saved"), "includeGroupMessages");
     this.addToggle(rules, this.tr("群聊必须提及机器人", "Require a bot mention in groups"), this.tr("减少群聊噪声；需要平台提供 mention 信息", "Reduces group noise; requires mention metadata from the platform"), "requireMentionInGroups");
+    const remote = parent.createDiv({ cls: "od-panel" });
+    remote.createEl("h3", { text: this.tr("远程查询与导出", "Remote search and export") });
+    remote.createEl("p", { text: this.tr(
+      "查询和打包是插件内置能力，九个渠道共用。渠道 SDK 已经打进本插件，只要在「渠道」页启用并授权即可，不必另装依赖或插件。确认后会按该渠道官方接口尝试发回文件；失败时仍会留下文字回执。WhatsApp 仍可能需要本机 Node.js 20.18+，那是隔离进程，与导出无关。",
+      "Search and packing are built into this plugin and shared by all nine channels. Channel SDKs are already bundled, so enable and authorize a channel on the Channels page—do not install extra packages. After confirmation the plugin tries to send the packed file through that channel's official API; a text receipt remains if sending fails. WhatsApp may still need local Node.js 20.18+, which is an isolated process and unrelated to export.",
+    ) });
+    new Setting(remote)
+      .setName(this.tr("允许 Bot 查询笔记", "Allow the bot to search notes"))
+      .setDesc(this.tr(
+        "默认关闭。开启后，已连接渠道可发送“查 关键词”（查 和关键词之间必须有空格；查手机卡会记进日记）。插件只返回标题、时间、来源和路径；你回复“确认 1,3”或 “confirm 1,3” 后才读取全文、按电脑端默认格式打包，并尝试把可打开的附件发回当前渠道。电脑需开着 Obsidian。",
+        "Off by default. When enabled, a connected channel can send “search keyword” or “查 关键词”. A space after the command is required; “查手机卡” is saved as diary text. The plugin returns only title, time, source, and path. After you reply “confirm 1,3” or “确认 1,3”, it packs the notes on this computer and tries to send an openable file on the current channel. Obsidian must stay open on this computer.",
+      ))
+      .addToggle((toggle) => toggle.setValue(this.plugin.settings.remoteSearch.enabled === true).onChange(async (value) => {
+        this.plugin.settings.remoteSearch.enabled = value;
+        if (!value) this.plugin.remoteSearch?.clearAll();
+        await this.plugin.saveSettings();
+        this.render();
+      }));
+    new Setting(remote)
+      .setName(this.tr("查询范围", "Search folder"))
+      .setDesc(this.tr(
+        "只搜索这个文件夹下的 Markdown 笔记。留空表示整个库。",
+        "Search Markdown notes only in this folder. Leave empty for the whole vault.",
+      ))
+      .addText((input) => input.setPlaceholder("/").setValue(this.plugin.settings.remoteSearch.folder || "").onChange(async (value) => {
+        this.plugin.settings.remoteSearch.folder = value.trim();
+        this.plugin.remoteSearch?.clearAll();
+        await this.plugin.saveSettings();
+      }));
+    const currentExportFormat = remoteExportFormat(this.plugin.settings);
+    const formatOptions = {};
+    for (const [id, labels] of Object.entries(REMOTE_EXPORT_FORMATS)) formatOptions[id] = this.locale() === "en" ? labels.en : labels.zh;
+    new Setting(remote)
+      .setName(this.tr("默认导出格式", "Default export format"))
+      .setDesc(this.tr(
+        "Bot 端只回复要导出的编号，不再选择格式。MD 最快且完整保留原文；PDF 使用系统中文字体生成图像型页面，显示稳定但正文不可选中复制。",
+        "The bot only replies with item numbers and never chooses a format. Markdown is fastest and keeps the original text. PDF uses system CJK fonts as image pages, so display is stable but text is not selectable.",
+      ))
+      .addDropdown((dropdown) => dropdown.addOptions(formatOptions).setValue(currentExportFormat).onChange(async (value) => {
+        this.plugin.settings.remoteSearch.exportFormat = Object.prototype.hasOwnProperty.call(REMOTE_EXPORT_FORMATS, value) ? value : "md";
+        await this.plugin.saveSettings();
+      }));
+    if (this.plugin.settings.remoteSearch.enabled === true) {
+      remote.createEl("p", { cls: "setting-item-description", text: this.tr(
+        "命令必须带空格：查 关键词 → 确认 1,3；英文 search keyword → confirm 1,3。查询结果 2 小时过期；一次最多显示 10 条、导出 20 条，导出文件上限 20MB。",
+        "A space is required: 查 关键词 → 确认 1,3, or search keyword → confirm 1,3. Results expire after 2 hours. Up to 10 results are shown, 20 notes can be packed, and the packed file is limited to 20MB.",
+      ) });
+    }
     new Setting(rules).setName(this.tr("单个附件上限", "Per-attachment limit")).setDesc("1–100 MB").addText((input) => {
       input.inputEl.setAttr("type", "number"); input.inputEl.setAttr("min", "1"); input.inputEl.setAttr("max", "100");
       input.setValue(String(this.plugin.settings.capture.maxFileMb)).onChange(async (value) => {
@@ -636,7 +685,7 @@ class DiarySettingTab extends PluginSettingTab {
     points.createEl("li", { text: this.tr("消息正文、网页正文、代码平台收藏和下载成功的附件写入当前 Vault。", "Message text, web articles, code-platform bookmarks, and successfully downloaded attachments are written to the current Vault.") });
     points.createEl("li", { text: this.tr("代码平台选择“只分类收藏地址”时，插件只解析 URL 并写入本地笔记，不访问目标网页。", "When code-platform handling is set to “File bookmark only,” the plugin parses the URL and writes a local note without visiting the target page.") });
     points.createEl("li", { text: this.tr("Bot Token、App Secret、扫码凭据与云文档浏览器会话保存在插件 data.json 或 .channel-data 目录，未做额外加密。", "Bot tokens, app secrets, QR credentials, and cloud-document browser sessions are stored in the plugin's data.json or .channel-data directory without additional encryption.") });
-    points.createEl("li", { text: this.tr("插件不会扫描与收集目录无关的笔记，也不会自动发布任何内容。", "The plugin does not scan notes outside its capture workflow and never publishes content automatically.") });
+    points.createEl("li", { text: this.tr("默认不扫描收集目录以外的笔记，也不会自动发布任何内容。只有开启「远程查询与导出」后，才会按你设定的文件夹读取 Vault 内 Markdown，用于返回标题、时间、来源和路径，并在确认后打包。", "By default the plugin does not scan notes outside its capture workflow and never publishes content automatically. Only after Remote search and export is enabled does it read Markdown in the chosen folder, return titles, times, sources, and paths, and pack notes after confirmation.") });
     const network = parent.createDiv({ cls: "od-panel od-privacy-panel" });
     network.createEl("h3", { text: this.tr("网络访问", "Network access") });
     network.createEl("p", { text: this.tr(

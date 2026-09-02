@@ -3,7 +3,7 @@
 The plugin has four product layers:
 
 1. A channel adapter converts a platform event into a small capture envelope.
-2. A deterministic router handles `/help`, `/status`, and `/clip`; all other content goes directly to capture.
+2. A deterministic router handles `/help`, `/status`, `/clip`, and optional remote-search commands (`查 关键词` / `search keyword`, `确认` / `confirm`, `导出` / `export`, `取消查询` / `cancel search`). Command words must be separated from the keyword by a space. Search and packing are shared across channels. After confirmation the router asks the current channel to send an openable file through `replyFile`.
 3. The diary service de-duplicates message IDs, saves chat attachments, routes recognized code-platform URLs through the user's extract/bookmark/both rule, and invokes adapter-based web clipping for remaining HTTP(S) links.
 4. The Vault writer serializes appends and creates folders, Markdown files, and binary assets through the Obsidian Vault API.
 
@@ -20,6 +20,8 @@ The web clipping layer routes known content before generic Readability extractio
 - other HTML pages use Readability and the existing local-image pipeline.
 
 There is no model invocation or semantic decision layer.
+
+Remote search is a separate opt-in layer. When disabled, `查` / `确认` never scan the Vault and never write a diary entry. When enabled, the plugin returns title, time, source, and path first; after confirmation it packs Markdown notes on the computer as md, txt, docx, or pdf and tries to send that file through the current channel's official API. A text receipt remains if sending fails.
 
 The code-platform registry is separate from community extraction. It describes stable host families and URL shapes, classifies repository/resource metadata locally, and supports user-supplied self-hosted domains. Bookmark notes are idempotent by normalized URL and grouped by platform in a dedicated folder.
 

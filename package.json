@@ -1,6 +1,6 @@
 {
   "name": "obsidian-omnichannel-diary",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "private": true,
   "description": "Save messages, links, and attachments from chat channels to a local Obsidian vault.",
   "repository": {

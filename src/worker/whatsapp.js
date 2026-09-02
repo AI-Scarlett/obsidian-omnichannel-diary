@@ -187,6 +187,24 @@ async function runWhatsAppWorker(options = {}) {
         throw error;
       }
     }
+    if (message?.type === "reply-file" && socket && message.jid) {
+      const messageId = crypto.randomBytes(10).toString("hex").toUpperCase();
+      outboundReplies.remember(messageId);
+      try {
+        const fileName = String(message.fileName || "export.bin");
+        const mimetype = String(message.mimeType || "application/octet-stream");
+        await socket.sendMessage(message.jid, {
+          document: Buffer.from(String(message.base64 || ""), "base64"),
+          fileName,
+          mimetype,
+          caption: fileName,
+        }, { messageId });
+      } catch (error) {
+        outboundReplies.forget(messageId);
+        emit({ type: "status", state: "error", detail: `${tr("WhatsApp 发送文件失败：", "WhatsApp file send failed: ")}${error?.message || error}` });
+        throw error;
+      }
+    }
     if (message?.type === "stop") {
       stopped = true;
       try { socket?.end(undefined); } catch (_) {}

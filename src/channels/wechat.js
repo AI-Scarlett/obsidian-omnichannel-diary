@@ -64,6 +64,19 @@ function replyClientId() {
   return `omnichannel-diary:${Date.now()}-${crypto.randomBytes(8).toString("hex")}`;
 }
 
+function md5Hex(buf) {
+  return crypto.createHash("md5").update(buf).digest("hex").toLowerCase();
+}
+
+function aesEcbPaddedSize(n) {
+  return Math.ceil((Number(n) + 1) / 16) * 16;
+}
+
+function encryptAesEcb(plaintext, key) {
+  const cipher = crypto.createCipheriv("aes-128-ecb", key, null);
+  return Buffer.concat([cipher.update(plaintext), cipher.final()]);
+}
+
 function buildTextReply(message, text, clientId = replyClientId()) {
   if (!message?.from_user_id) throw new Error("微信消息缺少发送者 ID，无法回复");
   if (!message?.context_token) throw new Error("微信消息缺少 context_token，无法回复");
@@ -78,6 +91,100 @@ function buildTextReply(message, text, clientId = replyClientId()) {
       item_list: [{ type: 1, text_item: { text: String(text || "") } }],
     },
   };
+}
+
+function wechatFileName(file) {
+  const raw = String(file?.name || "export.bin").replace(/[\/:*?"<>|\x00-\x1f]/g, "_").trim() || "export.bin";
+  if (pathExt(raw)) return raw;
+  const ext = String(file?.format || "").replace(/^\./, "").toLowerCase();
+  return ext ? `${raw}.${ext}` : raw;
+}
+
+function pathExt(name) {
+  const match = String(name || "").match(/\.([A-Za-z0-9]{1,8})$/);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function buildFileReply(message, file, downloadParam, aeskey, clientId = replyClientId()) {
+  if (!message?.from_user_id) throw new Error("微信消息缺少发送者 ID，无法回复");
+  if (!message?.context_token) throw new Error("微信消息缺少 context_token，无法回复");
+  const buffer = Buffer.isBuffer(file?.buffer) ? file.buffer : Buffer.from(file?.buffer || []);
+  const fileName = wechatFileName(file);
+  return {
+    msg: {
+      from_user_id: "",
+      to_user_id: message.from_user_id,
+      client_id: clientId,
+      message_type: 2,
+      message_state: 2,
+      context_token: message.context_token,
+      item_list: [{
+        type: 4,
+        file_item: {
+          media: {
+            encrypt_query_param: downloadParam,
+            aes_key: Buffer.from((Buffer.isBuffer(aeskey) ? aeskey : Buffer.from(String(aeskey || ""), "utf8")).toString("hex")).toString("base64"),
+            encrypt_type: 1,
+          },
+          file_name: fileName,
+          file_ext: pathExt(fileName),
+          md5: md5Hex(buffer),
+          len: String(buffer.length),
+        },
+      }],
+    },
+  };
+}
+
+async function uploadIlinkCdn(url, encrypted) {
+  const { response } = await safeFetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/octet-stream" },
+    body: encrypted,
+    accept: "application/octet-stream",
+    timeoutMs: 60_000,
+    allowPrivateResolvedHost: isOfficialWechatRemoteUrl,
+  });
+  const downloadParam = response.headers.get("x-encrypted-param");
+  try { await readLimitedBody(response, 1024 * 1024); } catch (_) {}
+  if (!response.ok) throw new Error(`WeChat CDN returned HTTP ${response.status}`);
+  if (!downloadParam) throw new Error("微信 CDN 上传成功但缺少 x-encrypted-param");
+  return String(downloadParam);
+}
+
+async function sendIlinkFile(baseUrl, token, message, file) {
+  const buffer = Buffer.isBuffer(file?.buffer) ? file.buffer : Buffer.from(file?.buffer || []);
+  if (!buffer.length) throw new Error("导出文件为空");
+  if (buffer.length > 20 * 1024 * 1024) throw new Error("导出文件超过 20MB 上限");
+  const filekey = crypto.randomBytes(16).toString("hex");
+  const aeskey = crypto.randomBytes(16);
+  const uploadUrlResp = await ilinkJson(baseUrl, "ilink/bot/getuploadurl", {
+    token,
+    body: {
+      filekey,
+      media_type: 3,
+      to_user_id: message.from_user_id,
+      rawsize: buffer.length,
+      rawfilemd5: md5Hex(buffer),
+      filesize: aesEcbPaddedSize(buffer.length),
+      no_need_thumb: true,
+      aeskey: aeskey.toString("hex"),
+    },
+    timeoutMs: 45_000,
+  });
+  const uploadFullUrl = String(uploadUrlResp.upload_full_url || "").trim();
+  const uploadParam = String(uploadUrlResp.upload_param || "").trim();
+  if (!uploadFullUrl && !uploadParam) throw new Error("申请上传地址未返回 upload_full_url/upload_param");
+  const cdnUrl = uploadFullUrl || `${CDN_BASE_URL}/upload?encrypted_query_param=${encodeURIComponent(uploadParam)}&filekey=${encodeURIComponent(filekey)}`;
+  const downloadParam = await uploadIlinkCdn(cdnUrl, encryptAesEcb(buffer, aeskey));
+  const sent = await ilinkJson(baseUrl, "ilink/bot/sendmessage", {
+    token,
+    timeoutMs: 60_000,
+    body: buildFileReply(message, { ...file, buffer, name: wechatFileName(file) }, downloadParam, aeskey),
+  });
+  const code = sent?.ret ?? sent?.errcode ?? 0;
+  if (code) throw new Error(sent?.errmsg || sent?.msg || `WeChat file send failed ${code}`);
+  return sent;
 }
 
 async function ilinkJson(baseUrl, endpoint, options = {}) {
@@ -97,7 +204,8 @@ async function ilinkJson(baseUrl, endpoint, options = {}) {
   const text = (await readLimitedBody(response, 2 * 1024 * 1024)).toString("utf8");
   if (!response.ok) throw new Error(`WeChat API returned HTTP ${response.status}`);
   const parsed = JSON.parse(text || "{}");
-  if (parsed.ret && parsed.ret !== 0) throw new Error(parsed.errmsg || `WeChat API error ${parsed.ret}`);
+  const code = parsed.ret ?? parsed.errcode ?? 0;
+  if (code) throw new Error(parsed.errmsg || parsed.msg || `WeChat API error ${code}`);
   return parsed;
 }
 
@@ -231,6 +339,7 @@ class WeChatChannel extends BaseChannel {
           token: this.config.token,
           body: buildTextReply(message, text, outboundClientId),
         }),
+        replyFile: async (file) => sendIlinkFile(this.config.baseUrl || DEFAULT_BASE_URL, this.config.token, message, file),
       });
       if (delivery?.ok === false) throw delivery.error;
     }
@@ -250,4 +359,8 @@ class WeChatChannel extends BaseChannel {
   }
 }
 
-module.exports = { CHANNEL_VERSION, WeChatChannel, buildTextReply, clientVersion, downloadIlinkMedia, headers, ilinkJson, isOfficialWechatRemoteUrl, parseAesKey, randomUin, replyClientId };
+module.exports = {
+  CHANNEL_VERSION, WeChatChannel, aesEcbPaddedSize, buildFileReply, buildTextReply, clientVersion,
+  downloadIlinkMedia, encryptAesEcb, headers, ilinkJson, isOfficialWechatRemoteUrl, md5Hex,
+  parseAesKey, randomUin, replyClientId, sendIlinkFile, uploadIlinkCdn,
+};

@@ -34,6 +34,7 @@ class QQChannel extends BaseChannel {
           url: item.voice_wav_url || item.url,
         })),
         reply: async (text) => this.bot.sendText(message.replyTarget, text),
+        replyFile: async (file) => this.bot.sendFile(message.replyTarget, { buffer: file.buffer }, { fileName: file.name || "export.bin" }),
       });
     });
     this.setState("connecting", this.t("正在连接 QQ Gateway", "Connecting to QQ Gateway"));

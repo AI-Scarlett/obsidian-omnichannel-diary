@@ -2,6 +2,7 @@
 
 const { BaseChannel } = require("./base");
 const { readLimitedBody, safeFetch } = require("../core/network");
+const { encodeMultipart, exportMimeType } = require("../core/util");
 
 class TelegramChannel extends BaseChannel {
   constructor(config, context) {
@@ -17,6 +18,23 @@ class TelegramChannel extends BaseChannel {
       accept: "application/json",
       timeoutMs: method === "getUpdates" ? 45_000 : 20_000,
       signal,
+    });
+    const result = JSON.parse((await readLimitedBody(response, 4 * 1024 * 1024)).toString("utf8"));
+    if (!response.ok || !result.ok) throw new Error(result.description || `Telegram HTTP ${response.status}`);
+    return result.result;
+  }
+
+  async sendDocument(chatId, file, replyTo) {
+    const multipart = encodeMultipart(
+      { chat_id: String(chatId), ...(replyTo ? { reply_to_message_id: String(replyTo) } : {}) },
+      [{ field: "document", fileName: file?.name || "export.bin", mimeType: exportMimeType(file?.format, file?.name), buffer: file?.buffer }],
+    );
+    const { response } = await safeFetch(`https://api.telegram.org/bot${this.config.botToken}/sendDocument`, {
+      method: "POST",
+      headers: { "content-type": multipart.contentType },
+      body: multipart.body,
+      accept: "application/json",
+      timeoutMs: 60_000,
     });
     const result = JSON.parse((await readLimitedBody(response, 4 * 1024 * 1024)).toString("utf8"));
     if (!response.ok || !result.ok) throw new Error(result.description || `Telegram HTTP ${response.status}`);
@@ -56,6 +74,7 @@ class TelegramChannel extends BaseChannel {
       text: message.text || message.caption || "",
       attachments,
       reply: async (text) => this.api("sendMessage", { chat_id: chat.id, text, reply_parameters: { message_id: message.message_id } }),
+      replyFile: async (file) => this.sendDocument(chat.id, file, message.message_id),
     };
   }
 

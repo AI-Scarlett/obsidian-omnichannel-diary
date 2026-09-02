@@ -2,6 +2,7 @@
 
 const { normalizeLanguagePreference } = require("./i18n");
 const { normalizeAdditionalHosts, normalizeCodePlatformMode } = require("./code-platforms");
+const { normalizeRemoteSearchSettings } = require("./remote-search");
 
 const CHANNEL_IDS = ["wechat", "feishu", "dingtalk", "wecom", "qq", "slack", "telegram", "discord", "whatsapp"];
 
@@ -75,7 +76,12 @@ const DEFAULT_SETTINGS = {
     discord: { enabled: false, botToken: "" },
     whatsapp: { enabled: false, nodePath: "" },
   },
-  runtime: { recentMessageIds: [], pendingReceipts: [] },
+  remoteSearch: {
+    enabled: false,
+    folder: "",
+    exportFormat: "md",
+  },
+  runtime: { recentMessageIds: [], pendingReceipts: [], remoteQueries: [] },
 };
 
 function deepMerge(defaults, saved) {
@@ -112,6 +118,7 @@ function normalizeSettings(saved) {
   value.runtime.pendingReceipts = Array.isArray(value.runtime.pendingReceipts)
     ? value.runtime.pendingReceipts.filter((item) => item && typeof item.id === "string" && typeof item.text === "string").slice(-100)
     : [];
+  normalizeRemoteSearchSettings(value);
   for (const [id, fields] of Object.entries(REQUIRED_CREDENTIALS)) {
     if (value.channels[id].enabled && fields.some((field) => !String(value.channels[id][field] || "").trim())) {
       value.channels[id].enabled = false;
@@ -167,7 +174,12 @@ function migrateLegacySettings(saved) {
       discord: { enabled: Boolean(legacyChannels.discord?.enabled), botToken: "" },
       whatsapp: { enabled: Boolean(legacyChannels.whatsapp?.enabled), nodePath: "" },
     },
-    runtime: { recentMessageIds: [], pendingReceipts: [] },
+    remoteSearch: {
+      enabled: false,
+      folder: "",
+      exportFormat: "md",
+    },
+    runtime: { recentMessageIds: [], pendingReceipts: [], remoteQueries: [] },
   };
   return migrated;
 }

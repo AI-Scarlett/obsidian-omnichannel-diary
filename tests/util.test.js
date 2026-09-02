@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { assertSafeRemoteUrl, extractUrls, isPrivateHost, safeFileName } = require("../src/core/util");
+const { assertSafeRemoteUrl, encodeMultipart, exportMimeType, extractUrls, isPrivateHost, safeFileName } = require("../src/core/util");
 const { decodeDataUrl, readLimitedBody } = require("../src/core/network");
 
 test("URL extraction de-duplicates links and trims sentence punctuation", () => {
@@ -19,6 +19,16 @@ test("remote URL guard rejects local networks", () => {
 
 test("file names cannot escape the vault folder", () => {
   assert.equal(safeFileName("../../a:b?.png"), "-a-b-.png");
+});
+
+test("export mime types cover packed note formats", () => {
+  assert.equal(exportMimeType("md"), "text/markdown");
+  assert.equal(exportMimeType("txt"), "text/plain");
+  assert.equal(exportMimeType("docx"), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  assert.equal(exportMimeType("pdf"), "application/pdf");
+  const packed = encodeMultipart({ type: "file" }, [{ field: "media", fileName: "a.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF") }]);
+  assert.match(packed.body.toString("latin1"), /filename="a.pdf"/);
+  assert.match(packed.body.toString("latin1"), /%PDF/);
 });
 
 test("data URLs decode without a network request", () => {

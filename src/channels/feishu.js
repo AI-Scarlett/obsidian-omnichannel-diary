@@ -1,6 +1,8 @@
 "use strict";
 
 const { BaseChannel } = require("./base");
+const { readLimitedBody, safeFetch } = require("../core/network");
+const { encodeMultipart, exportMimeType } = require("../core/util");
 
 let larkRuntime;
 function loadLarkRuntime() {
@@ -23,10 +25,11 @@ function streamResponse(response, fileName, mimeType) {
 }
 
 class FeishuApiClient {
-  constructor(config, domain, http) {
+  constructor(config, domain, http, options = {}) {
     this.config = config;
     this.domain = String(domain).replace(/\/$/, "");
     this.http = http || loadLarkRuntime().defaultHttpInstance;
+    this.fetch = options.fetch || safeFetch;
     this.token = "";
     this.tokenExpiresAt = 0;
   }
@@ -68,6 +71,45 @@ class FeishuApiClient {
       params: { receive_id_type: "chat_id" },
     });
     if (response?.code !== undefined && response.code !== 0) throw new Error(response.msg || "Feishu reply failed");
+    return response;
+  }
+
+  async uploadFile(file) {
+    const fileName = String(file?.name || "export.bin");
+    const buffer = Buffer.isBuffer(file?.buffer) ? file.buffer : Buffer.from(file?.buffer || []);
+    if (!buffer.length) throw new Error("导出文件为空");
+    const multipart = encodeMultipart(
+      { file_type: "stream", file_name: fileName },
+      [{ field: "file", fileName, mimeType: file?.mimeType || exportMimeType(file?.format, fileName), buffer }],
+    );
+    const { response } = await this.fetch(`${this.domain}/open-apis/im/v1/files`, {
+      method: "POST",
+      headers: { ...(await this.headers()), "content-type": multipart.contentType },
+      body: multipart.body,
+      accept: "application/json",
+      timeoutMs: 60_000,
+    });
+    const text = (await readLimitedBody(response, 2 * 1024 * 1024)).toString("utf8");
+    let parsed = {};
+    try { parsed = JSON.parse(text || "{}"); } catch (_) { parsed = {}; }
+    const fileKey = parsed?.data?.file_key || parsed?.file_key;
+    if (!response.ok || (parsed?.code !== undefined && parsed.code !== 0) || !fileKey) {
+      throw new Error(parsed?.msg || parsed?.message || `Feishu file upload failed HTTP ${response.status}`);
+    }
+    return fileKey;
+  }
+
+  async replyFile(chatId, file) {
+    const fileKey = await this.uploadFile(file);
+    const response = await this.http.post(`${this.domain}/open-apis/im/v1/messages`, {
+      receive_id: chatId,
+      msg_type: "file",
+      content: JSON.stringify({ file_key: fileKey }),
+    }, {
+      headers: await this.headers(),
+      params: { receive_id_type: "chat_id" },
+    });
+    if (response?.code !== undefined && response.code !== 0) throw new Error(response.msg || "Feishu file reply failed");
     return response;
   }
 }
@@ -150,7 +192,11 @@ class FeishuChannel extends BaseChannel {
       attachments.push(this.resourceAttachment(message.message_id, content.image_key, "image", `feishu-cover-${message.message_id}.jpg`, "image/jpeg"));
     }
     const senderId = sender.sender_id?.open_id || sender.sender_id?.user_id || "feishu-user";
-    const text = content.text || content.content || (message.message_type === "post" ? JSON.stringify(content) : "");
+    let text = "";
+    if (typeof content.text === "string") text = content.text;
+    else if (typeof content.content === "string") text = content.content;
+    else if (message.message_type === "post") text = JSON.stringify(content);
+    else if (content && typeof content === "object") text = JSON.stringify(content);
     return {
       id: message.message_id,
       timestamp: new Date(Number(message.create_time || 0) || Date.now()),
@@ -161,6 +207,7 @@ class FeishuChannel extends BaseChannel {
       text,
       attachments,
       reply: async (replyText) => this.client.reply(message.chat_id, replyText),
+      replyFile: async (file) => this.client.replyFile(message.chat_id, file),
     };
   }
 

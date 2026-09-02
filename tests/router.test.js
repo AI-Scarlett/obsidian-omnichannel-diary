@@ -27,7 +27,7 @@ test("help and status follow the user's English language choice", async () => {
   await router.handle({ text: "/status", reply: async (text) => replies.push(text) });
   assert.equal(replies[0], formatHelpText("en", { diaryFolder: "Notes/Daily" }));
   assert.match(replies[0], /quick-capture Agent/);
-  assert.match(replies[0], /“Notes\/Daily” folder/);
+  assert.match(replies[0], /Send “help” anytime/);
   assert.match(replies[1], /1 channel online/);
   assert.doesNotMatch(replies.join("\n"), /[\u4e00-\u9fff]/);
 });
@@ -68,8 +68,7 @@ test("capture receipts use the same friendly format across all nine channels", a
   assert.equal(replies[0], [
     "🔖 《月入30万美元，这位英国老兵把最“土”的网站做到了月访问791万》已提取正文和 7 张图片并保存到「全渠道剪藏」",
     "",
-    "嗨~ 我是你的随手记 Agent ✍️",
-    "想记什么直接发给我，文字、语音、图片、文件都行，我会记到你今天的笔记里。发网页链接，我会提取支持的文章、云文档、PDF，以及国内外技术社区的帖子、问答和评论串，存成 Markdown 剪藏，并在今天的笔记里留入口。代码平台地址会按你的设置提取、分类收藏，或两者都做。记的东西在 Obsidian 的「日记」文件夹；想换地方：Obsidian 设置 → 第三方插件 → Omnichannel Diary → 存储与隐私 → 每日笔记。说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。",
+    "嗨~ 我是你的随手记 Agent ✍️ 想记什么直接发给我，说错了可以直接在 Obsidian 里修改，随时发「帮助」看全部用法。",
   ].join("\n"));
 });
 
@@ -100,7 +99,7 @@ test("English capture receipts are friendly and identical across all nine channe
   assert.equal(new Set(replies).size, 1);
   assert.equal(replies.length, 9);
   assert.match(replies[0], /^🔖 “A practical guide to local-first capture” was saved to “Clippings” with the full text and 1 image\./);
-  assert.match(replies[0], /Hi! I'm your quick-capture Agent/);
+  assert.match(replies[0], /Hi~ I'm your quick-capture Agent/);
   assert.doesNotMatch(replies[0], /[\u4e00-\u9fff]/);
 });
 

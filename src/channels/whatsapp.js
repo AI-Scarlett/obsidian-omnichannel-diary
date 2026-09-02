@@ -2,6 +2,7 @@
 
 const { fork } = require("node:child_process");
 const { BaseChannel } = require("./base");
+const { exportMimeType } = require("../core/util");
 
 const WHATSAPP_WORKER_FLAG = "--omnichannel-whatsapp-worker";
 const COMMAND_TIMEOUT_MS = 45_000;
@@ -154,6 +155,17 @@ class WhatsAppChannel extends BaseChannel {
       reply: async (text) => {
         if (!this.child) throw new Error(this.t("WhatsApp 连接不可用", "WhatsApp connection unavailable"));
         await this.child.postMessage({ type: "reply", jid: value.replyTarget, text });
+      },
+      replyFile: async (file) => {
+        if (!this.child) throw new Error(this.t("WhatsApp 连接不可用", "WhatsApp connection unavailable"));
+        await this.child.postMessage({
+          type: "reply-file",
+          jid: value.replyTarget,
+          fileName: file.name,
+          mimeType: file.mimeType || exportMimeType(file.format, file.name),
+          format: file.format,
+          base64: Buffer.from(file.buffer).toString("base64"),
+        }, 90_000);
       },
     });
   }

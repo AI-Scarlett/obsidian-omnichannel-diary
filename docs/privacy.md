@@ -11,6 +11,7 @@ The plugin writes:
 - plugin settings and channel credentials in `data.json`;
 - WhatsApp linked-device state under `.channel-data/whatsapp-auth`.
 - isolated Chromium-compatible profiles for cloud-document and registered community adapters under `.channel-data/document-sessions`. The profile for a sign-in or verification flow is created only when the user opens that flow; headless public extraction profiles contain only browsing state created by this plugin.
+- pending remote-search candidate metadata in `data.json` after the user enables Remote search and export. Candidate lists store path, title, time, source, and mtime only. Full note bodies are read only after confirmation, to generate a local packed file.
 
 Credential fields are not additionally encrypted. Anyone with access to the Vault's plugin directory may be able to read them.
 
@@ -39,5 +40,7 @@ The dynamic renderer launches an already installed Chrome, Edge, Brave, or Chrom
 WhatsApp runs in an isolated Node.js 20.18+ process so a protocol failure cannot crash the Obsidian renderer. Dynamic document extraction may launch an installed Chromium-compatible browser. Both launches use fixed argument arrays with no shell, accept only allowlisted executable names, and never download or install an executable. Direct filesystem writes are scoped to `.channel-data` beneath this plugin's directory; system paths are only checked while locating an allowlisted Node or browser executable.
 
 ## Not performed
+
+By default the plugin does not scan Markdown notes outside the capture workflow. Enabling Remote search and export allows the plugin to read Markdown files in the chosen folder so a connected bot can return titles, times, sources, and paths, and later pack confirmed notes on this computer.
 
 The plugin has no telemetry, analytics, crash upload, hosted relay, AI provider, automatic publishing, advertising, remote feature flag, runtime dependency installer, or self-update code.

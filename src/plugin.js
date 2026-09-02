@@ -10,6 +10,7 @@ const { WebSessionManager } = require("./core/browserclip");
 const { VaultWriter } = require("./core/vault");
 const { DiaryService } = require("./core/diary");
 const { CaptureRouter } = require("./core/router");
+const { RemoteSearchService } = require("./core/remote-search");
 const { ChannelManager } = require("./channels");
 const { DiarySettingTab, ManualCaptureModal } = require("./ui/settings-tab");
 
@@ -22,10 +23,18 @@ class OmnichannelDiaryPlugin extends Plugin {
     this.writer = new VaultWriter(this.app.vault);
     this.webSessionManager = new WebSessionManager(this.channelDataPath("document-sessions", true));
     this.diary = new DiaryService(this.writer, () => this.settings, () => this.saveSettings(), { sessionManager: this.webSessionManager });
+    this.remoteSearch = new RemoteSearchService({
+      getVault: () => this.app.vault,
+      getMetadataCache: () => this.app.metadataCache,
+      getSettings: () => this.settings,
+      persist: () => this.saveSettings(),
+    });
     this.channelManager = new ChannelManager(this, async (envelope) => this.router.handle(envelope));
     this.router = new CaptureRouter(this.diary, () => this.channelManager.getStatuses(), {
       getLocale: () => this.locale(),
       getStorage: () => this.settings.storage,
+      getRemoteSearch: () => this.settings.remoteSearch,
+      remoteSearch: this.remoteSearch,
     });
     this.settingTab = new DiarySettingTab(this.app, this);
     this.addSettingTab(this.settingTab);

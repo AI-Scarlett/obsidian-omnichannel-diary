@@ -3,12 +3,35 @@
 const WebSocket = require("ws");
 const { BaseChannel } = require("./base");
 const { readLimitedBody, safeFetch } = require("../core/network");
+const { encodeMultipart, exportMimeType } = require("../core/util");
 
 class SlackChannel extends BaseChannel {
   constructor(config, context) {
     super("slack", config, context);
     this.socket = null;
     this.reconnectTimer = null;
+  }
+
+  async uploadFile(channel, threadTs, file) {
+    const multipart = encodeMultipart(
+      {
+        channels: channel,
+        thread_ts: threadTs,
+        filename: file?.name || "export.bin",
+        title: file?.name || "export.bin",
+      },
+      [{ field: "file", fileName: file?.name || "export.bin", mimeType: exportMimeType(file?.format, file?.name), buffer: file?.buffer }],
+    );
+    const { response } = await safeFetch("https://slack.com/api/files.upload", {
+      method: "POST",
+      headers: { authorization: `Bearer ${this.config.botToken}`, "content-type": multipart.contentType },
+      body: multipart.body,
+      accept: "application/json",
+      timeoutMs: 60_000,
+    });
+    const result = JSON.parse((await readLimitedBody(response, 2 * 1024 * 1024)).toString("utf8"));
+    if (!response.ok || !result.ok) throw new Error(result.error || `Slack HTTP ${response.status}`);
+    return result;
   }
 
   async webApi(method, data, token = this.config.botToken) {
@@ -63,6 +86,7 @@ class SlackChannel extends BaseChannel {
       text: event.text || "",
       attachments: files,
       reply: async (text) => this.webApi("chat.postMessage", { channel: event.channel, thread_ts: event.ts, text }),
+      replyFile: async (file) => this.uploadFile(event.channel, event.ts, file),
     });
   }
 

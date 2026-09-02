@@ -65,6 +65,42 @@ function assertSafeRemoteUrl(value) {
   return url;
 }
 
+function encodeMultipart(fields = {}, files = []) {
+  const boundary = `----odboundary${crypto.randomBytes(12).toString("hex")}`;
+  const chunks = [];
+  const push = (value) => chunks.push(Buffer.isBuffer(value) ? value : Buffer.from(String(value), "utf8"));
+  for (const [name, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) continue;
+    push(`--${boundary}\r\nContent-Disposition: form-data; name="${String(name).replace(/[\r\n"]/g, "")}"\r\n\r\n${String(value)}\r\n`);
+  }
+  for (const file of files) {
+    const field = String(file.field || "file").replace(/[\r\n"]/g, "");
+    const fileName = String(file.fileName || "file.bin").replace(/[\r\n"]/g, "_");
+    const mimeType = file.mimeType || "application/octet-stream";
+    push(`--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`);
+    push(file.buffer || Buffer.alloc(0));
+    push("\r\n");
+  }
+  push(`--${boundary}--\r\n`);
+  return {
+    boundary,
+    contentType: `multipart/form-data; boundary=${boundary}`,
+    body: Buffer.concat(chunks),
+  };
+}
+
+function exportMimeType(format, fileName = "") {
+  const key = String(format || "").toLowerCase() || String(fileName || "").split(".").pop().toLowerCase();
+  const map = {
+    md: "text/markdown",
+    markdown: "text/markdown",
+    txt: "text/plain",
+    pdf: "application/pdf",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  };
+  return map[key] || "application/octet-stream";
+}
+
 function mimeExtension(mime, fallback = "bin") {
   const map = {
     "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp",
@@ -78,4 +114,4 @@ function toErrorMessage(error) {
   return String(error?.message || error || "Unknown error");
 }
 
-module.exports = { assertSafeRemoteUrl, extractUrls, isPrivateHost, localDateParts, markdownEscape, mimeExtension, safeFileName, shortHash, toErrorMessage, yamlString };
+module.exports = { assertSafeRemoteUrl, encodeMultipart, exportMimeType, extractUrls, isPrivateHost, localDateParts, markdownEscape, mimeExtension, safeFileName, shortHash, toErrorMessage, yamlString };
