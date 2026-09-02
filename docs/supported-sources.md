@@ -2,6 +2,20 @@
 
 Omnichannel Diary uses three extraction layers. A structured public adapter is preferred where a platform exposes stable post/comment data. Registered dynamic pages use a Vault-owned Chromium profile. All other pages retain the generic Readability path, with automatic forum/comment detection when common conversation markup is present.
 
+## Filing by type
+
+Clippings are no longer mixed in one folder. Capture rules let you enable or disable each type and choose a subfolder under the clipping root:
+
+| Type | Typical sources | Default subfolder |
+| --- | --- | --- |
+| Articles | News, blogs, and unmatched pages | `Articles` |
+| Social | X / Twitter, WeChat articles, Xiaohongshu / REDnote | `Social` |
+| Community | Forums, Q&A, issues / PRs, and posts with comments | `Community` |
+| Cloud documents | Feishu / Lark, Tencent Docs, WPS / KDocs | `Documents` |
+| PDFs | Direct online PDFs and PDF attachments from chat | `PDFs` |
+
+If a type is disabled, that link stays in today's daily note and is not clipped. Code-platform bookmarks still use the separate Code Links folder.
+
 ## Code-platform links
 
 Code-hosting URLs are recognized before ordinary clipping. The user chooses one deterministic rule for repository pages and resources such as issues, pull/merge requests, discussions, releases, commits, trees, and files:

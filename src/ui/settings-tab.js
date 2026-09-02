@@ -3,6 +3,7 @@
 const QRCode = require("qrcode");
 const { Modal, Notice, PluginSettingTab, Setting, setIcon } = require("obsidian");
 const { CHANNEL_IDS, clearChannelCredentials, getChannelMeta } = require("../core/settings");
+const { CLIP_FAMILIES, CLIP_FAMILY_IDS } = require("../core/clip-rules");
 const { REMOTE_EXPORT_FORMATS, remoteExportFormat } = require("../core/remote-search");
 const { codePlatformCoverage } = require("../core/code-platforms");
 const { COMMUNITY_SERVICES, DOCUMENT_SERVICES, communityCoverage } = require("../core/web-platforms");
@@ -450,12 +451,12 @@ class DiarySettingTab extends PluginSettingTab {
     storage.createEl("h3", { text: this.tr("Vault 目录", "Vault folders") });
     for (const [key, name, desc] of (this.locale() === "en" ? [
       ["diaryFolder", "Daily notes", "Creates YYYY-MM-DD.md using the local date"],
-      ["clippingFolder", "Web clippings", "Article text and source metadata"],
+      ["clippingFolder", "Web clippings root", "Root folder; each clipping type below can use its own subfolder"],
       ["codePlatformFolder", "Code-platform links", "Categorized bookmark notes grouped by platform"],
       ["attachmentFolder", "Local attachments", "Stores chat attachments and web images in separate subfolders"],
     ] : [
       ["diaryFolder", "每日笔记", "按本地日期生成 YYYY-MM-DD.md"],
-      ["clippingFolder", "网页剪藏", "正文与来源元数据"],
+      ["clippingFolder", "网页剪藏根目录", "总目录；下面每种剪藏类型可再设子目录"],
       ["codePlatformFolder", "代码平台收藏", "按平台分组保存代码仓库与资源地址"],
       ["attachmentFolder", "本地附件", "聊天附件与网页图片分目录保存"],
     ])) {
@@ -465,15 +466,38 @@ class DiarySettingTab extends PluginSettingTab {
     }
     const rules = parent.createDiv({ cls: "od-panel" });
     rules.createEl("h3", { text: this.tr("收集规则", "Capture rules") });
-    this.addToggle(rules, this.tr("自动剪藏网页", "Automatically clip web pages"), this.tr("检测消息中的 HTTP(S) 链接并保存可读正文", "Detect HTTP(S) links in messages and save readable article text"), "autoClipLinks");
+    this.addToggle(rules, this.tr("自动剪藏网页", "Automatically clip web pages"), this.tr("检测消息中的 HTTP(S) 链接并按下面的类型规则保存", "Detect HTTP(S) links in messages and save them using the type rules below"), "autoClipLinks");
     this.addToggle(rules, this.tr("保存网页图片", "Save web images"), this.tr("把正文图片下载到 Vault；失败时保留远程地址并写明数量", "Download article images into the Vault; keep remote URLs and report failures"), "downloadWebImages");
     this.addToggle(rules, this.tr("渲染动态网页与云文档", "Render dynamic pages and cloud documents"), this.tr(
       "用独立本地浏览器提取云文档及国内外技术社区的正文、问答和评论",
       "Use an isolated local browser for cloud documents and posts, answers, and comments from technical communities worldwide",
     ), "renderDynamicPages");
     this.addToggle(rules, this.tr("保存聊天附件", "Save chat attachments"), this.tr("图片、文件、音频和视频按渠道保存", "Store images, files, audio, and video by channel"), "downloadChatAttachments");
-    this.addToggle(rules, this.tr("收集群聊消息", "Capture group messages"), this.tr("关闭后只保存私聊", "When disabled, only direct messages are saved"), "includeGroupMessages");
-    this.addToggle(rules, this.tr("群聊必须提及机器人", "Require a bot mention in groups"), this.tr("减少群聊噪声；需要平台提供 mention 信息", "Reduces group noise; requires mention metadata from the platform"), "requireMentionInGroups");
+    const clipRules = parent.createDiv({ cls: "od-panel" });
+    clipRules.createEl("h3", { text: this.tr("剪藏类型", "Clipping types") });
+    clipRules.createEl("p", { text: this.tr(
+      "手机发来的链接按类型分流，不再全部堆进同一个剪藏目录。关闭某类型后，该类型链接只留在当天日记里，不生成剪藏。子目录相对上面的剪藏根目录；留空则直接写到根目录。",
+      "Links from chat are filed by type instead of one mixed clipping folder. If a type is off, that link stays in today's note and is not clipped. Subfolders are relative to the clipping root above; leave empty to write into the root.",
+    ) });
+    for (const id of CLIP_FAMILY_IDS) {
+      const family = CLIP_FAMILIES[id];
+      const rule = this.plugin.settings.capture.clipRules[id] || { enabled: true, folder: family.defaultFolder };
+      const row = clipRules.createDiv({ cls: "od-clip-rule" });
+      new Setting(row)
+        .setName(this.tr(family.zh, family.en))
+        .setDesc(this.tr(family.zhDesc, family.enDesc))
+        .addToggle((toggle) => toggle.setValue(rule.enabled !== false).onChange(async (value) => {
+          this.plugin.settings.capture.clipRules[id].enabled = value;
+          await this.plugin.saveSettings();
+        }));
+      new Setting(row)
+        .setName(this.tr("保存到子目录", "Save to subfolder"))
+        .setDesc(this.tr("相对网页剪藏根目录", "Relative to the web-clippings root"))
+        .addText((input) => input.setPlaceholder(family.defaultFolder).setValue(rule.folder || "").onChange(async (value) => {
+          this.plugin.settings.capture.clipRules[id].folder = value.trim();
+          await this.plugin.saveSettings();
+        }));
+    }
     const remote = parent.createDiv({ cls: "od-panel" });
     remote.createEl("h3", { text: this.tr("远程查询与导出", "Remote search and export") });
     remote.createEl("p", { text: this.tr(

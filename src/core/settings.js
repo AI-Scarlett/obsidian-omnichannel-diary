@@ -2,6 +2,7 @@
 
 const { normalizeLanguagePreference } = require("./i18n");
 const { normalizeAdditionalHosts, normalizeCodePlatformMode } = require("./code-platforms");
+const { defaultClipRules, normalizeClipRules } = require("./clip-rules");
 const { normalizeRemoteSearchSettings } = require("./remote-search");
 
 const CHANNEL_IDS = ["wechat", "feishu", "dingtalk", "wecom", "qq", "slack", "telegram", "discord", "whatsapp"];
@@ -62,8 +63,7 @@ const DEFAULT_SETTINGS = {
     maxWebImages: 30,
     maxWebImageTotalMb: 50,
     webClipBudgetSeconds: 75,
-    includeGroupMessages: true,
-    requireMentionInGroups: false,
+    clipRules: defaultClipRules(),
   },
   channels: {
     wechat: { enabled: false, token: "", accountId: "", userId: "", baseUrl: "https://ilinkai.weixin.qq.com", syncBuf: "" },
@@ -113,6 +113,7 @@ function normalizeSettings(saved) {
   value.capture.maxWebImageTotalMb = Math.min(500, Math.max(1, Number(value.capture.maxWebImageTotalMb) || 50));
   value.capture.webClipBudgetSeconds = Math.min(180, Math.max(15, Number(value.capture.webClipBudgetSeconds) || 75));
   value.capture.browserExecutable = String(value.capture.browserExecutable || "").trim();
+  value.capture.clipRules = normalizeClipRules(value.capture.clipRules);
   value.ui.language = normalizeLanguagePreference(value.ui.language);
   value.runtime.recentMessageIds = Array.isArray(value.runtime.recentMessageIds) ? value.runtime.recentMessageIds.slice(-500) : [];
   value.runtime.pendingReceipts = Array.isArray(value.runtime.pendingReceipts)
@@ -153,8 +154,7 @@ function migrateLegacySettings(saved) {
       maxWebImages: Number(legacySettings.webClipMaxImages) || DEFAULT_SETTINGS.capture.maxWebImages,
       maxWebImageTotalMb: Number(legacySettings.webClipMaxTotalImageMb) || DEFAULT_SETTINGS.capture.maxWebImageTotalMb,
       webClipBudgetSeconds: DEFAULT_SETTINGS.capture.webClipBudgetSeconds,
-      includeGroupMessages: true,
-      requireMentionInGroups: false,
+      clipRules: defaultClipRules(),
     },
     channels: {
       wechat: {

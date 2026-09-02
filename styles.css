@@ -108,6 +108,9 @@
 .od-support-tag { padding: 5px 8px; border: 1px solid var(--od-border); border-radius: 999px; color: var(--text-muted); font-size: 11px; line-height: 1.2; }
 .od-support-tag.is-api { border-color: color-mix(in srgb, var(--od-accent) 32%, var(--od-border)); background: var(--od-accent-soft); color: var(--od-accent); }
 .od-clear-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.od-clip-rule { margin: 0 0 8px; padding: 4px 0 8px; border-bottom: 1px solid var(--od-border); }
+.od-clip-rule:last-child { border-bottom: 0; margin-bottom: 0; }
+.od-clip-rule .setting-item { padding: 10px 0; }
 .od-session-row { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--od-border); }
 .od-session-copy { flex: 1; min-width: 0; }
 .od-session-copy strong, .od-session-copy span { display: block; }

@@ -9,7 +9,7 @@ Version 0.4.x is an independent implementation. It does not contain source code 
 ## What it saves
 
 - Plain messages are appended to `Omnichannel Diary/Daily/YYYY-MM-DD.md`.
-- HTTP(S) links can be converted to readable Markdown notes under `Omnichannel Diary/Clippings`.
+- HTTP(S) links can be converted to readable Markdown notes under `Omnichannel Diary/Clippings`, then filed by type: Articles, Social, Community, Documents, and PDFs. Each type can be turned off or given its own subfolder in Capture rules.
 - Code-platform links have an independent rule: extract the page, file only a categorized bookmark under `Omnichannel Diary/Code Links/<Platform>`, or do both. Bookmark-only mode never opens the target page.
 - The built-in registry covers GitHub, GitLab, Bitbucket, Azure DevOps, Codeberg, SourceHut, SourceForge, Launchpad, GNU Savannah, Hugging Face Hub, GitFlic, Google Git, Gitee, GitCode, JiHu GitLab, CODING, AtomGit, and GitLink. Custom self-hosted GitLab, Gitea, Forgejo, or internal hosts can be added in settings.
 - X posts/articles and WeChat articles retain their dedicated extractors. Xiaohongshu/REDnote notes use the page's non-executable initial-state data to preserve the text and every full-size carousel image. Reddit posts include nested public comments when its public endpoint is available; an isolated signed-in browser session handles access challenges.
@@ -86,7 +86,7 @@ Open **Settings → Omnichannel Diary**.
 1. In **Channels**, expand a card.
 2. Use QR authorization where the official platform supports it, or enter the official Bot credentials.
 3. Enable the channel and use **Test reconnect**.
-4. In **Capture rules**, choose folders, code-platform link handling, optional self-hosted code-platform domains, link clipping, dynamic-page rendering, image downloads, group behavior, and file-size limits. To search notes from chat, enable **Remote search and export** on the same page. Channel SDKs are already bundled; do not install extra packages.
+4. In **Capture rules**, choose folders, clipping types and subfolders, code-platform link handling, optional self-hosted code-platform domains, link clipping, dynamic-page rendering, image downloads, and file-size limits. To search notes from chat, enable **Remote search and export** on the same page. Channel SDKs are already bundled; do not install extra packages.
 5. For a private Feishu, Tencent Docs, or WPS link, open its isolated sign-in window in **Capture rules → Private cloud-document sessions**, complete sign-in, and close that window. Community sites that present a login or human check have separate opt-in verification windows.
 
 The **Storage & privacy** page explains every local and network data boundary and can clear individual channel credentials.

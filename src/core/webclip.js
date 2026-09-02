@@ -10,6 +10,7 @@ const { extractRedditPost, parseRedditUrl } = require("./redditclip");
 const { COMMUNITY_SERVICES, communityServiceForUrl, documentServiceForUrl, isLikelyPdfUrl, renderServiceForUrl } = require("./web-platforms");
 const { extractXStatus } = require("./xclip");
 const { extractXiaohongshu, isXiaohongshuUrl } = require("./xhsclip");
+const { classifyClipFamily, isClipFamilyEnabled, resolveClipFolder } = require("./clip-rules");
 
 const WECHAT_NOISE_SELECTORS = [
   "#js_pc_qr_code", "#js_article_bottom_bar", "#js_bottom_ad_area", "#js_sponsor_ad_area",
@@ -572,7 +573,11 @@ class WebClipper {
     const budgetMs = Math.max(10, Number(this.settings.capture.webClipBudgetSeconds) || 75) * 1000;
     const deadline = Number(source.deadline) || Date.now() + budgetMs;
     const article = await deadlinePromise(this.extract(url), deadline, "Web clipping exceeded its time budget");
-    return this.saveArticle(article, source, { deadline });
+    const family = classifyClipFamily(url, article);
+    if (!isClipFamilyEnabled(this.settings, family)) {
+      throw new Error("该剪藏类型已关闭");
+    }
+    return this.saveArticle(article, source, { deadline, family });
   }
 
   async saveArticle(article, source = {}, options = {}) {
@@ -581,10 +586,12 @@ class WebClipper {
     const stem = safeFileName(title, new URL(article.url).hostname);
     const identityUrl = article.identityUrl || article.canonicalUrl || normalizedIdentityUrl(article.url);
     const suffix = `-${shortHash(identityUrl)}.md`;
+    const family = options.family || classifyClipFamily(article.url, article);
+    const clipFolder = resolveClipFolder(this.settings, family);
     const existingPath = typeof this.writer.findTextBySuffix === "function"
-      ? this.writer.findTextBySuffix(this.settings.storage.clippingFolder, suffix)
+      ? this.writer.findTextBySuffix(clipFolder, suffix)
       : "";
-    const notePath = existingPath || `${this.settings.storage.clippingFolder}/${date.day}-${stem}${suffix}`;
+    const notePath = existingPath || `${clipFolder}/${date.day}-${stem}${suffix}`;
     const reused = Boolean(existingPath);
     let markdown = article.markdown || article.excerpt || article.url;
     const failures = [];

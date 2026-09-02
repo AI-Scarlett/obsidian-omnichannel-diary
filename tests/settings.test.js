@@ -38,6 +38,30 @@ test("saved values are merged, folders normalized, and unknown inherited keys dr
   assert.equal(settings.ui.language, "auto");
   assert.equal(settings.capture.renderDynamicPages, true);
   assert.equal(settings.capture.browserExecutable, "");
+  assert.equal(settings.capture.clipRules.articles.enabled, true);
+  assert.equal(settings.capture.clipRules.social.folder, "Social");
+  assert.equal(settings.capture.includeGroupMessages, undefined);
+  assert.equal(settings.capture.requireMentionInGroups, undefined);
+});
+
+test("clipping type rules keep unknown families out and sanitize subfolders", () => {
+  const settings = normalizeSettings({
+    schemaVersion: 1,
+    capture: {
+      clipRules: {
+        articles: { enabled: false, folder: "/News\\Blogs/" },
+        pdfs: { enabled: "no", folder: "../escape" },
+        mystery: { enabled: true, folder: "Nope" },
+      },
+    },
+  });
+  assert.equal(settings.capture.clipRules.articles.enabled, false);
+  assert.equal(settings.capture.clipRules.articles.folder, "News/Blogs");
+  assert.equal(settings.capture.clipRules.social.enabled, true);
+  assert.equal(settings.capture.clipRules.social.folder, "Social");
+  assert.equal(settings.capture.clipRules.pdfs.enabled, true);
+  assert.equal(settings.capture.clipRules.pdfs.folder, "escape");
+  assert.equal(settings.capture.clipRules.mystery, undefined);
 });
 
 test("new web clipping limits default to a bounded message budget", () => {

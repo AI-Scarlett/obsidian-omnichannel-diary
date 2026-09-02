@@ -9,7 +9,7 @@ Omnichannel Diary 将聊天平台中的消息、网页和附件保存到本地 O
 ## 可以保存什么
 
 - 普通消息会追加到 `Omnichannel Diary/Daily/YYYY-MM-DD.md`。
-- HTTP(S) 链接可转换为可读的 Markdown 笔记，保存到 `Omnichannel Diary/Clippings`。
+- HTTP(S) 链接可转换为可读的 Markdown 笔记，保存到 `Omnichannel Diary/Clippings`，再按类型进入 Articles、Social、Community、Documents、PDFs。每种类型可在收集规则里关闭，或指定自己的子目录。
 - 代码平台地址使用独立规则：提取网页、仅将地址分类收藏到 `Omnichannel Diary/Code Links/<平台>`，或者两者都做。“只分类收藏”模式不会访问目标网页。
 - 内置识别 GitHub、GitLab、Bitbucket、Azure DevOps、Codeberg、SourceHut、SourceForge、Launchpad、GNU Savannah、Hugging Face Hub、GitFlic、Google Git、Gitee、GitCode、极狐 GitLab、CODING、AtomGit 和 GitLink。也可以在设置中添加自建 GitLab、Gitea、Forgejo 或内部代码平台域名。
 - X 帖子/文章与微信公众号文章使用专用提取器。小红书/REDnote 笔记会安全解析页面中不执行的初始状态数据，保存正文和全部高清轮播图片。Reddit 公开接口可用时会保存帖子及嵌套评论；遇到访问限制时可使用隔离的登录浏览器会话。
@@ -86,7 +86,7 @@ WhatsApp 需要本机安装 Node.js 20.18 或更高版本。传输代码仍内�
 1. 在**渠道**页面展开一个渠道卡片。
 2. 官方平台支持扫码时使用二维码授权，否则填写平台签发的 Bot 凭据。
 3. 启用渠道并点击**测试重连**。
-4. 在**收集规则**中配置目录、代码平台处理方式、自建代码平台域名、链接剪藏、动态页面渲染、图片下载、群聊规则和文件大小限制。若要从聊天查询电脑上的笔记，在同一页打开**远程查询与导出**；渠道 SDK 已内置，不必另装依赖。
+4. 在**收集规则**中配置目录、剪藏类型与子目录、代码平台处理方式、自建代码平台域名、链接剪藏、动态页面渲染、图片下载和文件大小限制。若要从聊天查询电脑上的笔记，在同一页打开**远程查询与导出**；渠道 SDK 已内置，不必另装依赖。
 5. 私有飞书文档、腾讯文档或 WPS 链接需要在**收集规则 → 私有云文档登录**中打开隔离登录窗口，完成登录后关闭窗口。遇到登录或真人验证的技术社区可使用各自独立且需主动启用的验证窗口。
 
 **存储与隐私**页面会解释所有本地和网络数据边界，并可单独清除各渠道凭据。

@@ -5,6 +5,7 @@ const { CodePlatformBookmarkStore, classifyCodePlatformUrl, normalizeCodePlatfor
 const { extractPdf } = require("./pdfclip");
 const { WebClipper } = require("./webclip");
 const { extractUrls, localDateParts, markdownEscape, safeFileName, shortHash } = require("./util");
+const { classifyClipFamily, isClipFamilyEnabled } = require("./clip-rules");
 
 function isPdfAttachment(saved) {
   return String(saved.mimeType || "").toLowerCase().includes("application/pdf") || /\.pdf$/i.test(saved.fileName || "");
@@ -121,8 +122,6 @@ class DiaryService {
 
   async capture(envelope) {
     const settings = this.getSettings();
-    if (envelope.isGroup && !settings.capture.includeGroupMessages) return { ignored: "group-disabled" };
-    if (envelope.isGroup && settings.capture.requireMentionInGroups && !envelope.mentioned) return { ignored: "mention-required" };
     const messageKey = this.messageKey(envelope);
     if (this.isDuplicate(envelope)) return { ignored: "duplicate", messageKey, pendingReceipt: this.pendingReceipt(messageKey) };
 
@@ -146,7 +145,7 @@ class DiaryService {
         try {
           const saved = await this.materializeAttachment(attachment, attachmentFolder, index);
           attachmentLines.push(saved.mimeType.startsWith("image/") ? `![[${saved.path}]]` : `[[${saved.path}]]`);
-          if (isPdfAttachment(saved)) {
+          if (isPdfAttachment(saved) && isClipFamilyEnabled(settings, "pdfs")) {
             try {
               const sourceUrl = attachmentSourceUrl(envelope, saved.fileName);
               const article = await this.pdfExtractor(
@@ -185,7 +184,8 @@ class DiaryService {
           }
         }
         if (!codePlatform || codeMode === "extract" || codeMode === "both") {
-          clipTargets.push(url);
+          if (isClipFamilyEnabled(settings, classifyClipFamily(url))) clipTargets.push(url);
+          else clipFailures.push(`${url}: 该剪藏类型已关闭`);
         }
       }
       const messageBudgetMs = Math.max(15, Number(settings.capture.webClipBudgetSeconds) || 75) * 1000;

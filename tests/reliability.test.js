@@ -8,7 +8,7 @@ const { WeChatChannel } = require("../src/channels/wechat");
 function settings() {
   return {
     storage: { diaryFolder: "日记", clippingFolder: "剪藏", codePlatformFolder: "代码平台收藏", attachmentFolder: "附件", addSourceMetadata: true },
-    capture: { autoClipLinks: false, codePlatformMode: "extract", codePlatformAdditionalHosts: "", downloadWebImages: false, downloadChatAttachments: false, maxFileMb: 20, includeGroupMessages: true, requireMentionInGroups: false },
+    capture: { autoClipLinks: false, codePlatformMode: "extract", codePlatformAdditionalHosts: "", downloadWebImages: false, downloadChatAttachments: false, maxFileMb: 20 },
     runtime: { recentMessageIds: [], pendingReceipts: [] },
   };
 }
@@ -167,7 +167,7 @@ test("chat PDF attachments are saved once, extracted, and linked from the daily 
   assert.equal(result.savedAttachments, 1);
   assert.equal(result.clips.length, 1);
   assert.equal(result.attachmentExtractionFailures.length, 0);
-  assert.match(writes[0].path, /^剪藏\//);
+  assert.match(writes[0].path, /^剪藏\/PDFs\//);
   assert.match(writes[0].content, /Original PDF/);
   assert.match(writes[0].content, /PDF text/);
   assert.match(writes[1].content, /PDF 剪藏：\[\[/);
