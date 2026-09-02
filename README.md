@@ -15,7 +15,7 @@ Version 0.4.x is an independent implementation. It does not contain source code 
 - X posts/articles and WeChat articles retain their dedicated extractors. Xiaohongshu/REDnote notes use the page's non-executable initial-state data to preserve the text and every full-size carousel image. Reddit posts include nested public comments when its public endpoint is available; an isolated signed-in browser session handles access challenges.
 - Technical-community detail pages use an extensible registry rather than hard-coded routing. Hacker News, GitHub issues/pull requests, Stack Exchange, DEV/Forem, Discourse forums, and V2EX have structured post/comment adapters with browser fallback.
 - Dynamic community pages cover Product Hunt, GitHub Discussions, Medium, Hashnode, Substack, Lobsters, Indie Hackers, Hugging Face, Kaggle, 掘金, CSDN, 博客园, SegmentFault, 开源中国, 知乎, 少数派, InfoQ, 腾讯云/阿里云开发者社区, 51CTO, Gitee, and GitCode. A generic forum detector also preserves visible comments from unlisted Discourse/Forem/Flarum/NodeBB-style pages.
-- Public and private Feishu/Lark, Tencent Docs, and WPS/KDocs pages can be rendered with an isolated local browser profile. The plugin never imports cookies from the user's normal browser profile.
+- Public and private Feishu/Lark, Tencent Docs, WPS/KDocs, Google Docs/Sheets/Slides, and Microsoft 365/OneDrive pages can be rendered with an isolated local browser profile. Public Google documents first try the official export endpoint. The plugin never imports cookies from the user's normal browser profile.
 - Direct online PDFs are extracted page by page and the original PDF is stored beside the clipping.
 - Community receipts report the number of captured comments in the same bilingual reply format used by every chat channel.
 - Chat attachments and web images are downloaded into `Omnichannel Diary/Attachments`.
@@ -87,7 +87,7 @@ Open **Settings → Omnichannel Diary**.
 2. Use QR authorization where the official platform supports it, or enter the official Bot credentials.
 3. Enable the channel and use **Test reconnect**.
 4. In **Capture rules**, choose folders, clipping types and subfolders, code-platform link handling, optional self-hosted code-platform domains, link clipping, dynamic-page rendering, image downloads, and file-size limits. To search notes from chat, enable **Remote search and export** on the same page. Channel SDKs are already bundled; do not install extra packages.
-5. For a private Feishu, Tencent Docs, or WPS link, open its isolated sign-in window in **Capture rules → Private cloud-document sessions**, complete sign-in, and close that window. Community sites that present a login or human check have separate opt-in verification windows.
+5. For a private Feishu, Tencent Docs, WPS, Google, or Microsoft 365 link, open its isolated sign-in window in **Capture rules → Private cloud-document sessions**, complete sign-in, and close that window. Community sites that present a login or human check have separate opt-in verification windows.
 
 The **Storage & privacy** page explains every local and network data boundary and can clear individual channel credentials.
 

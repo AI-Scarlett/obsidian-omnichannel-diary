@@ -28,7 +28,7 @@ Network access is initiated only for enabled features:
 - Telegram: `api.telegram.org`;
 - Discord: `discord.com` API and Discord Gateway/CDN;
 - WhatsApp: endpoints selected by the bundled linked-device transport;
-- Web clipping: the supplied page URL, redirect targets, image/resource URLs found in its readable content (including Xiaohongshu/REDnote's `xhslink.cn` share links and `xhscdn.com` note images), direct PDF files, public endpoints used for Reddit, Hacker News, GitHub, Stack Exchange, DEV/Forem, Discourse, and V2EX, plus rendered cloud-document and registered community pages.
+- Web clipping: the supplied page URL, redirect targets, image/resource URLs found in its readable content (including Xiaohongshu/REDnote's `xhslink.cn` share links and `xhscdn.com` note images), direct PDF files, public endpoints used for Reddit, Hacker News, GitHub, Stack Exchange, DEV/Forem, Discourse, V2EX, and public Google document export, plus rendered cloud-document and registered community pages (including Google Docs/Drive and Microsoft 365/OneDrive).
 - Code-platform links: bookmark-only mode performs no request to the supplied code-platform URL; extraction and combined modes use the web-clipping destinations above.
 
 The direct web clipper validates every HTTP(S) redirect and DNS result. The dynamic renderer intercepts browser requests and applies the same public-host validation before continuing them. Both reject localhost, link-local ranges, private IPv4 ranges, private IPv6 ranges, and non-HTTP protocols.

@@ -7,7 +7,7 @@ const { downloadRemoteFile, readLimitedBody, safeFetch } = require("./network");
 const { localDateParts, safeFileName, shortHash, yamlString } = require("./util");
 const { extractPdf } = require("./pdfclip");
 const { extractRedditPost, parseRedditUrl } = require("./redditclip");
-const { COMMUNITY_SERVICES, communityServiceForUrl, documentServiceForUrl, isLikelyPdfUrl, renderServiceForUrl } = require("./web-platforms");
+const { COMMUNITY_SERVICES, DOCUMENT_SERVICES, communityServiceForUrl, documentServiceForUrl, googleDocumentKind, googleExportUrl, googleFileIdFromUrl, isLikelyPdfUrl, renderServiceForUrl } = require("./web-platforms");
 const { extractXStatus } = require("./xclip");
 const { extractXiaohongshu, isXiaohongshuUrl } = require("./xhsclip");
 const { classifyClipFamily, isClipFamilyEnabled, resolveClipFolder } = require("./clip-rules");
@@ -422,6 +422,50 @@ function articleFromHtml(html, finalUrl, overrides = {}) {
   };
 }
 
+function looksLikeGoogleExportLogin(text) {
+  const sample = String(text || "").replace(/\s+/g, " ").slice(0, 4_000);
+  return sample.length < 2_000 && /sign in(?: to continue)?(?: with google)?|accounts\.google\.com|使用 google 账号登录|登录 google/i.test(sample);
+}
+
+async function extractGoogleExport(url, fetchImpl = safeFetch) {
+  const fileId = googleFileIdFromUrl(url);
+  const kind = googleDocumentKind(url);
+  const exportUrl = googleExportUrl(url);
+  if (!fileId || !exportUrl) return null;
+  const { response, finalUrl } = await fetchImpl(exportUrl, {
+    accept: "text/plain,text/csv,text/html,application/pdf,*/*;q=0.8",
+    timeoutMs: 30_000,
+  });
+  if (!response.ok) throw new Error(`Google document export returned HTTP ${response.status}`);
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/pdf") || isLikelyPdfUrl(finalUrl)) {
+    const buffer = await readLimitedBody(response, 20 * 1024 * 1024);
+    return extractPdf(buffer, url, response.headers.get("content-disposition") || "");
+  }
+  const body = (await readLimitedBody(response, 5 * 1024 * 1024)).toString("utf8");
+  if (looksLikeGoogleExportLogin(body) || (contentType.includes("text/html") && /accounts\.google\.com|ServiceLogin/i.test(finalUrl))) {
+    const error = new Error("Google Docs login is required; open its isolated session in plugin settings first");
+    error.code = "DOCUMENT_LOGIN_REQUIRED";
+    throw error;
+  }
+  const titleMatch = String(response.headers.get("content-disposition") || "").match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i);
+  const title = titleMatch ? decodeURIComponent(titleMatch[1].replace(/\.csv$|\.txt$|\.html$/i, "")) : "Google document";
+  const html = contentType.includes("html")
+    ? body
+    : `<main><h1>${escapeWebText(title)}</h1><pre>${escapeWebText(body)}</pre></main>`;
+  const article = articleFromHtml(html, url, {
+    title,
+    siteName: "Google Docs / Drive",
+    content: html,
+    plainText: body,
+    extractionMethod: "google-export",
+  });
+  const kindPath = { document: "document", spreadsheets: "spreadsheets", presentation: "presentation" }[kind] || "document";
+  article.identityUrl = `https://docs.google.com/${kindPath}/d/${fileId}`;
+  article.canonicalUrl = url;
+  return article;
+}
+
 function deadlinePromise(promise, deadline, message) {
   const remaining = Number(deadline) - Date.now();
   if (!Number.isFinite(remaining) || remaining > 2_147_000_000) return promise;
@@ -455,6 +499,7 @@ class WebClipper {
     this.settings = settings;
     this.sessionManager = options.sessionManager;
     this.download = options.download || downloadRemoteFile;
+    this.fetch = options.fetch || safeFetch;
   }
 
   async extract(url) {
@@ -507,6 +552,14 @@ class WebClipper {
         }
       } catch (error) { communityError = error; }
     }
+    if (documentServiceForUrl(url) === "google") {
+      try {
+        const exported = await extractGoogleExport(url, this.fetch);
+        if (exported) return exported;
+      } catch (error) {
+        if (error?.code === "DOCUMENT_LOGIN_REQUIRED") throw error;
+      }
+    }
     const renderService = this.settings.capture.renderDynamicPages !== false ? renderServiceForUrl(url) : null;
     let renderError;
     if (renderService && this.sessionManager) {
@@ -521,7 +574,7 @@ class WebClipper {
           title: rendered.title,
           byline: rendered.author,
           excerpt: rendered.description,
-          siteName: COMMUNITY_SERVICES[renderService]?.name || new URL(rendered.url).hostname,
+          siteName: COMMUNITY_SERVICES[renderService]?.name || DOCUMENT_SERVICES[renderService]?.name || new URL(rendered.url).hostname,
           content: rendered.html,
           plainText: rendered.text,
           extractionMethod: documentServiceForUrl(rendered.url) ? `${renderService}-rendered-document` : `${renderService}-rendered-community-comments`,

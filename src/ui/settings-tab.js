@@ -717,7 +717,7 @@ class DiarySettingTab extends PluginSettingTab {
       "Enabled channels connect to their official API/CDN. Clipping visits link, article-image, and dynamic-page resource hosts. localhost, local networks, and private IPs are blocked.",
     ) });
     const chips = network.createDiv({ cls: "od-domain-chips" });
-    for (const domain of ["github.com / gitlab.com", "gitee.com / gitcode.com", "bitbucket.org / codeberg.org", "dev.azure.com / git.sr.ht", "weixin.qq.com", "xiaohongshu.com / xhslink.cn / xhscdn.com", "feishu.cn / larksuite.com", "docs.qq.com", "kdocs.cn / wps.cn", "reddit.com", "producthunt.com", "dingtalk.com", "work.weixin.qq.com", "qq.com", "slack.com", "telegram.org", "discord.com", "whatsapp.net"]) {
+    for (const domain of ["github.com / gitlab.com", "gitee.com / gitcode.com", "bitbucket.org / codeberg.org", "dev.azure.com / git.sr.ht", "weixin.qq.com", "xiaohongshu.com / xhslink.cn / xhscdn.com", "feishu.cn / larksuite.com", "docs.qq.com", "kdocs.cn / wps.cn", "docs.google.com / drive.google.com", "onedrive.live.com / sharepoint.com", "reddit.com", "producthunt.com", "dingtalk.com", "work.weixin.qq.com", "qq.com", "slack.com", "telegram.org", "discord.com", "whatsapp.net"]) {
       chips.createEl("code", { text: domain });
     }
     const credentials = parent.createDiv({ cls: "od-panel" });

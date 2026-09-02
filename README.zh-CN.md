@@ -15,7 +15,7 @@ Omnichannel Diary 将聊天平台中的消息、网页和附件保存到本地 O
 - X 帖子/文章与微信公众号文章使用专用提取器。小红书/REDnote 笔记会安全解析页面中不执行的初始状态数据，保存正文和全部高清轮播图片。Reddit 公开接口可用时会保存帖子及嵌套评论；遇到访问限制时可使用隔离的登录浏览器会话。
 - 技术社区详情页由可扩展注册表处理，不使用写死的单站路由。Hacker News、GitHub Issue/PR、Stack Exchange、DEV/Forem、Discourse 论坛和 V2EX 有结构化的帖子/评论适配器，并提供浏览器兜底。
 - 动态社区页面覆盖 Product Hunt、GitHub Discussions、Medium、Hashnode、Substack、Lobsters、Indie Hackers、Hugging Face、Kaggle、掘金、CSDN、博客园、SegmentFault、开源中国、知乎、少数派、InfoQ、腾讯云/阿里云开发者社区、51CTO、Gitee 和 GitCode。通用论坛检测还会保留未单独列出的 Discourse、Forem、Flarum、NodeBB 等页面中的可见评论。
-- 公开或私有的飞书/Lark 文档、腾讯文档和 WPS/KDocs 页面可通过隔离的本地浏览器渲染。插件不会读取用户日常浏览器中的 Cookie。
+- 公开或私有的飞书/Lark 文档、腾讯文档、WPS/KDocs、Google Docs/Sheets/Slides 和 Microsoft 365/OneDrive 页面可通过隔离的本地浏览器渲染。公开的 Google 文档会先走官方导出接口。插件不会读取用户日常浏览器中的 Cookie。
 - 在线 PDF 会逐页提取文字，并将原 PDF 保存在剪藏旁边。
 - 技术社区回执会报告已收集的评论数量，并使用所有聊天渠道统一的中英文回复格式。
 - 聊天附件和网页图片会下载到 `Omnichannel Diary/Attachments`。
@@ -87,7 +87,7 @@ WhatsApp 需要本机安装 Node.js 20.18 或更高版本。传输代码仍内�
 2. 官方平台支持扫码时使用二维码授权，否则填写平台签发的 Bot 凭据。
 3. 启用渠道并点击**测试重连**。
 4. 在**收集规则**中配置目录、剪藏类型与子目录、代码平台处理方式、自建代码平台域名、链接剪藏、动态页面渲染、图片下载和文件大小限制。若要从聊天查询电脑上的笔记，在同一页打开**远程查询与导出**；渠道 SDK 已内置，不必另装依赖。
-5. 私有飞书文档、腾讯文档或 WPS 链接需要在**收集规则 → 私有云文档登录**中打开隔离登录窗口，完成登录后关闭窗口。遇到登录或真人验证的技术社区可使用各自独立且需主动启用的验证窗口。
+5. 私有飞书文档、腾讯文档、WPS、Google 或 Microsoft 365 链接需要在**收集规则 → 私有云文档登录**中打开隔离登录窗口，完成登录后关闭窗口。遇到登录或真人验证的技术社区可使用各自独立且需主动启用的验证窗口。
 
 **存储与隐私**页面会解释所有本地和网络数据边界，并可单独清除各渠道凭据。
 

@@ -36,8 +36,8 @@ const CLIP_FAMILIES = {
     zh: "云文档",
     en: "Cloud documents",
     defaultFolder: "Documents",
-    zhDesc: "飞书 / Lark、腾讯文档、WPS / 金山文档",
-    enDesc: "Feishu / Lark, Tencent Docs, and WPS / KDocs",
+    zhDesc: "飞书 / Lark、腾讯文档、WPS、Google Docs / Sheets / Slides、Microsoft 365 / OneDrive",
+    enDesc: "Feishu / Lark, Tencent Docs, WPS, Google Docs / Sheets / Slides, and Microsoft 365 / OneDrive",
   },
   pdfs: {
     id: "pdfs",

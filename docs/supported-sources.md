@@ -11,7 +11,7 @@ Clippings are no longer mixed in one folder. Capture rules let you enable or dis
 | Articles | News, blogs, and unmatched pages | `Articles` |
 | Social | X / Twitter, WeChat articles, Xiaohongshu / REDnote | `Social` |
 | Community | Forums, Q&A, issues / PRs, and posts with comments | `Community` |
-| Cloud documents | Feishu / Lark, Tencent Docs, WPS / KDocs | `Documents` |
+| Cloud documents | Feishu / Lark, Tencent Docs, WPS / KDocs, Google Docs / Sheets / Slides, Microsoft 365 / OneDrive | `Documents` |
 | PDFs | Direct online PDFs and PDF attachments from chat | `PDFs` |
 
 If a type is disabled, that link stays in today's daily note and is not clipped. Code-platform bookmarks still use the separate Code Links folder.
@@ -29,6 +29,10 @@ Built-in international platforms: GitHub, GitLab, Bitbucket, Azure DevOps, Codeb
 Built-in China platforms: Gitee, GitCode, JiHu GitLab, CODING, AtomGit, and GitLink.
 
 Additional self-hosted GitLab, Gitea, Forgejo, and internal code-platform hostnames can be entered in settings. The setting accepts hostnames only and must never contain credentials or tokens.
+
+## Cloud documents
+
+Registered cloud-document links use the isolated Vault browser profile, with a dedicated sign-in window per service. Public Google Docs, Sheets, and Slides first try Google's official export endpoint (`/export?format=txt|csv`) and only render the page if that export is unavailable or requires sign-in. Microsoft 365 / OneDrive / SharePoint links are rendered after the user signs in through the isolated Microsoft session. Canvas-only or heavily virtualized editors can still yield a partial clipping; the original link remains in today's daily note if extraction fails.
 
 ## Structured sources
 

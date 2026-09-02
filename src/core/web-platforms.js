@@ -28,6 +28,46 @@ const DOCUMENT_SERVICES = {
     hosts: ["kdocs.cn", "wps.cn"],
     contentSelectors: [".kdocs-reader-content", ".editor-container", "[contenteditable='true']", "main", "body"],
   },
+  google: {
+    name: "Google Docs / Drive",
+    loginUrl: "https://accounts.google.com/ServiceLogin",
+    hosts: ["docs.google.com", "drive.google.com", "sheets.google.com", "slides.google.com"],
+    paths: [
+      /\/document\/(?:d|u\/\d+\/d)\//i,
+      /\/spreadsheets\/(?:d|u\/\d+\/d)\//i,
+      /\/presentation\/(?:d|u\/\d+\/d)\//i,
+      /\/file\/d\//i,
+      /^\/open\/?$/i,
+    ],
+    contentSelectors: [
+      ".kix-paginateddocumentplugin", ".kix-appview-editor", ".docs-texteventtarget-iframe",
+      ".waffle-grid-container", ".grid-container", ".punch-viewer-content",
+      "[contenteditable='true']", "article", "main", "body",
+    ],
+    authPattern: "sign in(?: to continue)?(?: with google)?|accounts.google.com|使用 google 账号登录|登录 google",
+  },
+  microsoft: {
+    name: "Microsoft 365 / OneDrive",
+    loginUrl: "https://login.microsoftonline.com/",
+    hosts: [
+      "onedrive.live.com", "1drv.ms", "sharepoint.com", "office.com", "officeapps.live.com",
+      "word.office.com", "excel.office.com", "powerpoint.office.com", "microsoft365.com",
+    ],
+    paths: [
+      /\/(?:personal|sites)\//i,
+      /\/:(?:w|x|p|b|f|o|u):\//i,
+      /\/(?:edit|view)\.aspx/i,
+      /\/Doc\.aspx/i,
+      /\/word\/offline/i,
+      /\/launch/i,
+      /^\/[wxpbf]\//i,
+    ],
+    contentSelectors: [
+      "#WACViewPanel_EditingElement", "#WACViewPanel", ".PageContent", ".OutlineElement",
+      "[data-automation-id='documentCanvas']", ".cui-widget", "[contenteditable='true']", "main", "body",
+    ],
+    authPattern: "sign in to (?:your )?microsoft|login.microsoftonline.com|work or school account|登录 microsoft|使用 microsoft 账户登录",
+  },
 };
 
 const COMMON_REMOVE_SELECTORS = [
@@ -210,6 +250,44 @@ function documentServiceForUrl(value) {
   return serviceForUrl(value, DOCUMENT_SERVICES);
 }
 
+function googleFileIdFromUrl(value) {
+  let url;
+  try { url = new URL(value); } catch (_) { return ""; }
+  if (!DOCUMENT_SERVICES.google.hosts.some((host) => hostMatches(url.hostname, host))) return "";
+  const published = url.pathname.match(/\/(?:document|spreadsheets|presentation)\/(?:d|u\/\d+\/d)\/e\/([^/]+)/i);
+  if (published) return published[1];
+  const fromPath = url.pathname.match(/\/(?:document|spreadsheets|presentation|file)\/(?:d|u\/\d+\/d)\/([^/]+)/i)
+    || url.pathname.match(/\/file\/d\/([^/]+)/i);
+  const fileId = fromPath?.[1] || url.searchParams.get("id") || "";
+  return fileId === "e" ? "" : fileId;
+}
+
+function googleDocumentKind(value) {
+  let url;
+  try { url = new URL(value); } catch (_) { return ""; }
+  const path = `${url.pathname}${url.search}`.toLowerCase();
+  if (/\/spreadsheets\//.test(path)) return "spreadsheets";
+  if (/\/presentation\//.test(path)) return "presentation";
+  if (/\/document\//.test(path)) return "document";
+  if (/\/file\//.test(path) || /^\/open\/?$/.test(url.pathname)) return "file";
+  return "";
+}
+
+function googleExportUrl(value, format = "txt") {
+  const fileId = googleFileIdFromUrl(value);
+  const kind = googleDocumentKind(value);
+  let pathname = "";
+  try { pathname = new URL(value).pathname; } catch (_) { return ""; }
+  if (/\/d\/e\//i.test(pathname) || /\/pub(?:html)?$/i.test(pathname)) return "";
+  if (!fileId || !["document", "spreadsheets", "presentation"].includes(kind)) return "";
+  const formatByKind = {
+    document: format === "html" ? "html" : "txt",
+    spreadsheets: format === "html" ? "html" : "csv",
+    presentation: "txt",
+  };
+  return `https://docs.google.com/${kind}/d/${encodeURIComponent(fileId)}/export?format=${formatByKind[kind]}`;
+}
+
 function communityServiceForUrl(value) {
   return serviceForUrl(value, COMMUNITY_SERVICES);
 }
@@ -246,6 +324,9 @@ module.exports = {
   communityCoverage,
   communityServiceForUrl,
   documentServiceForUrl,
+  googleDocumentKind,
+  googleExportUrl,
+  googleFileIdFromUrl,
   hostMatches,
   isLikelyPdfUrl,
   isProductHuntUrl,

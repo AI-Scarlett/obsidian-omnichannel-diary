@@ -183,7 +183,9 @@ function looksLikeAuthentication(payload, service) {
   const phrases = configured ? new RegExp(configured, "i") : service === "feishu" ? /扫码登录|登录飞书|sign in to (?:lark|feishu)/i
     : service === "tencent" ? /登录腾讯文档|微信扫码登录|qq扫码登录|sign in.*tencent docs/i
       : service === "wps" ? /登录.*wps|扫码登录|sign in.*wps/i
-        : /verify you are human|security verification|captcha|access denied/i;
+        : service === "google" ? /sign in(?: to continue)?(?: with google)?|accounts\.google\.com|使用 google 账号登录|登录 google/i
+          : service === "microsoft" ? /sign in to (?:your )?microsoft|login\.microsoftonline\.com|work or school account|登录 microsoft|使用 microsoft 账户登录/i
+            : /verify you are human|security verification|captcha|access denied/i;
   return text.length < 2_000 && phrases.test(text);
 }
 

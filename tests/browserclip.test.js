@@ -10,6 +10,14 @@ test("cloud documents and Product Hunt route to their rendered adapters", () => 
   assert.equal(documentServiceForUrl("https://example.feishu.cn/docx/abc"), "feishu");
   assert.equal(documentServiceForUrl("https://docs.qq.com/doc/abc"), "tencent");
   assert.equal(documentServiceForUrl("https://www.kdocs.cn/l/abc"), "wps");
+  assert.equal(documentServiceForUrl("https://docs.google.com/document/d/abc123xyz/edit"), "google");
+  assert.equal(documentServiceForUrl("https://docs.google.com/spreadsheets/d/abc123xyz/edit"), "google");
+  assert.equal(documentServiceForUrl("https://docs.google.com/presentation/d/abc123xyz/edit"), "google");
+  assert.equal(documentServiceForUrl("https://onedrive.live.com/edit.aspx?resid=ABC"), "microsoft");
+  assert.equal(documentServiceForUrl("https://contoso.sharepoint.com/:w:/r/sites/team/doc.docx"), "microsoft");
+  assert.equal(documentServiceForUrl("https://1drv.ms/w/s!abc"), "microsoft");
+  assert.equal(documentServiceForUrl("https://drive.google.com/drive/folders/abc"), null);
+  assert.equal(documentServiceForUrl("https://www.office.com/"), null);
   assert.equal(renderServiceForUrl("https://www.producthunt.com/posts/tool"), "producthunt");
   assert.equal(renderServiceForUrl("https://www.reddit.com/r/test/comments/abc/post"), "reddit");
   assert.equal(renderServiceForUrl("https://www.xiaohongshu.com/explore/abc123"), "xiaohongshu");
@@ -30,6 +38,8 @@ test("cloud documents and Product Hunt route to their rendered adapters", () => 
 
 test("login pages are detected without treating normal private document text as login", () => {
   assert.equal(looksLikeAuthentication({ url: "https://passport.wps.cn/login", text: "登录 WPS" }, "wps"), true);
+  assert.equal(looksLikeAuthentication({ url: "https://accounts.google.com/ServiceLogin", text: "Sign in with Google" }, "google"), true);
+  assert.equal(looksLikeAuthentication({ url: "https://login.microsoftonline.com/", text: "Sign in to Microsoft" }, "microsoft"), true);
   assert.equal(looksLikeAuthentication({ url: "https://docs.qq.com/doc/abc", text: "这是腾讯文档正文。".repeat(300) }, "tencent"), false);
   assert.equal(looksLikeBlockedPage({ title: "403 Forbidden", text: "403 Forbidden" }), true);
   assert.equal(looksLikeBlockedPage({ title: "An article", text: "Useful public text".repeat(300) }), false);
@@ -96,4 +106,37 @@ test("render requests sharing one browser profile are serialized", async () => {
   const values = await Promise.all([manager.extract("one", "feishu"), manager.extract("two", "feishu")]);
   assert.deepEqual(values, ["one", "two"]);
   assert.equal(peak, 1);
+});
+
+test("public Google documents use the official export endpoint before rendering", async () => {
+  const { googleExportUrl, googleFileIdFromUrl } = require("../src/core/web-platforms");
+  const source = "https://docs.google.com/document/d/abc123xyz/edit?usp=sharing";
+  assert.equal(googleFileIdFromUrl(source), "abc123xyz");
+  assert.equal(googleExportUrl(source), "https://docs.google.com/document/d/abc123xyz/export?format=txt");
+  const calls = [];
+  const body = Buffer.from("Public Google document body. ".repeat(20));
+  const clipper = new WebClipper({}, {
+    storage: { clippingFolder: "Clips", attachmentFolder: "Assets" },
+    capture: { renderDynamicPages: true, browserExecutable: "", downloadWebImages: false, maxFileMb: 20 },
+  }, {
+    sessionManager: { extract: async () => { throw new Error("must not render when export works"); } },
+    fetch: async (url) => {
+      calls.push(url);
+      return {
+        finalUrl: url,
+        response: {
+          ok: true,
+          status: 200,
+          headers: { get: (name) => name === "content-type" ? "text/plain; charset=utf-8" : name === "content-disposition" ? 'attachment; filename="Plan.txt"' : null },
+          body: (async function* () { yield body; })(),
+        },
+      };
+    },
+  });
+  const article = await clipper.extract(source);
+  assert.equal(article.extractionMethod, "google-export");
+  assert.equal(article.extractionStatus, "complete");
+  assert.match(article.markdown, /Public Google document body/);
+  assert.equal(article.identityUrl, "https://docs.google.com/document/d/abc123xyz");
+  assert.deepEqual(calls, ["https://docs.google.com/document/d/abc123xyz/export?format=txt"]);
 });
