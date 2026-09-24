@@ -3,6 +3,7 @@ import { builtinModules } from "node:module";
 import { readFile } from "node:fs/promises";
 
 const manifest = JSON.parse(await readFile("manifest.json", "utf8"));
+const donationQr = await readFile("docs/images/wechat-donation-qr.jpg");
 const banner = `/*
 Omnichannel Diary ${manifest.version}
 Generated from the independent source in src/. Do not edit this bundle directly.
@@ -41,6 +42,9 @@ const useExplicitHttpDecoders = {
 };
 
 await esbuild.build({
+  define: {
+    OMNICHANNEL_DONATION_QR: JSON.stringify(`data:image/jpeg;base64,${donationQr.toString("base64")}`),
+  },
   entryPoints: ["src/main.js"],
   bundle: true,
   platform: "node",

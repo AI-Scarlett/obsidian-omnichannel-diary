@@ -16,6 +16,7 @@ const SECTIONS = [
   { id: "channels", zh: "渠道", en: "Channels", icon: "messages-square" },
   { id: "capture", zh: "收集规则", en: "Capture rules", icon: "list-filter" },
   { id: "privacy", zh: "存储与隐私", en: "Storage & privacy", icon: "shield-check" },
+  { id: "support", zh: "支持开发", en: "Support development", icon: "coffee" },
 ];
 
 const CHANNEL_FIELDS = {
@@ -239,7 +240,26 @@ class DiarySettingTab extends PluginSettingTab {
     if (this.activeSection === "channels") this.renderChannels(content);
     if (this.activeSection === "capture") this.renderCapture(content);
     if (this.activeSection === "privacy") this.renderPrivacy(content);
+    if (this.activeSection === "support") this.renderSupport(content);
     this.refreshStatuses(this.plugin.channelManager.getStatuses());
+  }
+
+  renderSupport(parent) {
+    this.sectionHeader(parent, this.tr("支持开发", "Support development"), this.tr(
+      "如果插件让你的收集和整理更省心，欢迎用微信扫码，请作者喝杯咖啡。感谢你支持项目持续维护和改进！",
+      "If this plugin makes collecting and organizing your notes easier, you're welcome to buy the author a coffee via WeChat Pay. Thank you for supporting ongoing maintenance and improvements!",
+    ));
+    const panel = parent.createDiv({ cls: "od-panel od-donation-panel" });
+    panel.createEl("img", {
+      attr: {
+        src: OMNICHANNEL_DONATION_QR,
+        alt: this.tr("微信打赏二维码，支持 Omnichannel Diary 持续开发", "WeChat Pay QR code for voluntary donations to Omnichannel Diary"),
+      },
+    });
+    panel.createEl("p", { text: this.tr(
+      "打赏完全自愿。反馈问题、提出建议和给项目点 Star，同样是很好的支持。",
+      "Donations are entirely optional. Reporting bugs, sharing suggestions, and starring the project are also appreciated.",
+    ) });
   }
 
   renderHero(root) {

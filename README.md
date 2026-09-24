@@ -140,6 +140,8 @@ Omnichannel Diary is licensed under AGPL-3.0-only. Bundled third-party component
 
 ## Support development
 
+In Obsidian, open **Settings → Omnichannel Diary → Support development**. From 0.4.12, the QR image is bundled with the plugin and available offline; no extra files are needed.
+
 If Omnichannel Diary helps you collect messages, clip useful pages, and keep your notes organized, you're welcome to buy me a coffee via WeChat Pay. Your support helps me maintain the plugin and improve channel integrations and web clipping.
 
 Donations are entirely optional. Reporting bugs, sharing suggestions, and starring the project are also appreciated. Thank you for your support!

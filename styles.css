@@ -127,6 +127,8 @@
 .od-pair-status.is-error { color: var(--text-error); }
 .od-pair-footnote { margin: 0; color: var(--text-faint); font-size: 11px; }
 .od-manual-input { width: 100%; min-height: 150px; margin-top: 10px; resize: vertical; }
+.od-donation-panel img { display: block; width: 320px; max-width: 100%; height: auto; margin: 0 auto 16px; border-radius: 12px; }
+.od-donation-panel p { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
 .od-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px; }
 @media (max-width: 800px) {
   .od-hero { align-items: flex-start; flex-direction: column; padding: 25px; }
