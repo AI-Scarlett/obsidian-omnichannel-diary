@@ -135,3 +135,15 @@ The 0.4.x codebase was designed from product requirements and public platform/AP
 ## License
 
 Omnichannel Diary is licensed under AGPL-3.0-only. Bundled third-party components retain their own licenses; see [NOTICE.md](NOTICE.md).
+
+## Support development
+
+If Omnichannel Diary helps you collect messages, clip useful pages, and keep your notes organized, you're welcome to buy me a coffee via WeChat Pay. Your support helps me maintain the plugin and improve channel integrations and web clipping.
+
+Donations are entirely optional. Reporting bugs, sharing suggestions, and starring the project are also appreciated. Thank you for your support!
+
+<a href="docs/images/wechat-donation-qr.jpg">
+  <img src="docs/images/wechat-donation-qr.jpg" alt="WeChat Pay QR code for voluntary donations" width="300">
+</a>
+
+Scan with WeChat, or click the image to view it at full size.

@@ -135,3 +135,15 @@ npm run verify
 ## 许可证
 
 Omnichannel Diary 使用 AGPL-3.0-only 许可证。内置第三方组件保留各自许可证，详见 [NOTICE.md](NOTICE.md)。
+
+## 支持开发
+
+如果 Omnichannel Diary 帮你收集了零散消息、剪藏了有用网页，让笔记整理更省心，欢迎用微信扫码，请我喝杯咖啡。你的支持会帮助我持续维护插件，完善渠道接入和网页剪藏。
+
+打赏完全自愿。反馈问题、提出建议，或给项目点一个 Star，同样是很好的支持。谢谢你！
+
+<a href="docs/images/wechat-donation-qr.jpg">
+  <img src="docs/images/wechat-donation-qr.jpg" alt="微信打赏二维码，支持 Omnichannel Diary 持续开发" width="300">
+</a>
+
+使用微信扫一扫；点击图片可查看原图。
