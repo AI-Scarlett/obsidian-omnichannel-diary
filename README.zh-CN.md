@@ -2,6 +2,8 @@
 
 [English](README.md) | **简体中文**
 
+> ☕ 如果这个插件帮到了你，欢迎拉到文末[扫码打赏作者](#支持开发)，请我喝杯咖啡。感谢支持！
+
 Omnichannel Diary 将聊天平台中的消息、网页和附件保存到本地 Obsidian Vault。目前支持微信、飞书/Lark、钉钉、企业微信、QQ、Slack、Telegram、Discord 和 WhatsApp。
 
 0.4.x 版本是独立实现，不包含其他 Obsidian 日记插件的源代码，也不包含 AI 服务商、提示词、模型、语义路由、遥测、账户服务或托管中继。
